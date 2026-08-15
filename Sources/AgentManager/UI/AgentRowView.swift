@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// The vendor's own mark. AppKit rasterizes the bundled SVGs directly. Marks
-/// are inverted on a lit chip so a white logo stays legible on white.
+/// The vendor's own mark. AppKit rasterizes the bundled SVGs directly.
+///
+/// There is no inverted variant: the well behind it is always the same dark
+/// disc, so a mark that changed with state was the bug, not a feature.
 struct AgentLogo: View {
     let agent: AgentID
-    var inverted = false
 
     var body: some View {
         Group {
@@ -12,11 +13,11 @@ struct AgentLogo: View {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
-                    .colorMultiply(inverted && agent.markIsMonochrome ? Color(hex: 0x1A1A1C) : .white)
+                    .colorMultiply(.white)
             } else {
                 Text(String(agent.displayName.prefix(1)))
                     .font(BrandFont.body(12, weight: .semibold))
-                    .foregroundStyle(inverted ? Color(hex: 0x1A1A1C) : .white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
     }

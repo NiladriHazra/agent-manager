@@ -21,7 +21,7 @@ struct SessionRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
-                IconWell(agent: agent, lit: working)
+                IconWell(agent: agent)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(agent.displayName)
@@ -203,11 +203,13 @@ struct SubAgentRow: View {
     }
 }
 
-/// The circular icon well Control Center uses: a disc that lights up when the
-/// thing it represents is active.
+/// The circular icon well Control Center uses.
+///
+/// One appearance, always. It used to invert to a white disc while a session
+/// was working, so the same agent looked like two different marks depending on
+/// which tab you were on. State is the pill's job, not the logo's.
 struct IconWell: View {
     let agent: AgentID
-    var lit: Bool
     /// The chrome rim belongs to the disc in front. Repeating it on the discs
     /// behind a stack turns three clean edges into one smeared one.
     var bezel = true
@@ -217,19 +219,19 @@ struct IconWell: View {
         // The mark goes in an overlay, not behind: Liquid Glass composites
         // above whatever it is applied to, which hid the logo entirely.
         Circle()
-            .fill(lit ? Color.white.opacity(0.92) : Color.white.opacity(0.06))
+            .fill(Color.white.opacity(0.06))
             .overlay {
                 // Brushed-chrome bezel: a bright arc where the light lands, a
                 // dark one opposite, and a faint spectral split between them.
                 bezel ? AnyView(Circle().strokeBorder(
                     AngularGradient(
                         colors: [
-                            .white.opacity(lit ? 0.9 : 0.5),
+                            .white.opacity(0.5),
                             .white.opacity(0.08),
                             Color(red: 0.62, green: 0.78, blue: 1.0).opacity(0.4),
                             .white.opacity(0.05),
                             Color(red: 1.0, green: 0.82, blue: 0.72).opacity(0.32),
-                            .white.opacity(lit ? 0.9 : 0.5),
+                            .white.opacity(0.5),
                         ],
                         center: .center,
                         angle: .degrees(-58)
@@ -238,7 +240,7 @@ struct IconWell: View {
                 )) : AnyView(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 0.8))
             }
             .overlay {
-                AgentLogo(agent: agent, inverted: lit)
+                AgentLogo(agent: agent)
                     .frame(width: size * 0.53, height: size * 0.53)
             }
             .frame(width: size, height: size)

@@ -45,7 +45,7 @@ struct AgentGroupView: View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: toggleExpanded) {
                 HStack(spacing: 11) {
-                    StackedIcons(agent: group.agent, count: group.sessions.count, lit: working > 0)
+                    StackedIcons(agent: group.agent, count: group.sessions.count)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(group.agent.displayName)
@@ -120,7 +120,6 @@ struct AgentGroupView: View {
 struct StackedIcons: View {
     let agent: AgentID
     let count: Int
-    let lit: Bool
 
     private var depth: Int { min(count, 3) }
 
@@ -136,7 +135,7 @@ struct StackedIcons: View {
                     .frame(width: 30 - CGFloat(index) * 3, height: 30 - CGFloat(index) * 3)
                     .offset(x: CGFloat(index) * 7)
             }
-            IconWell(agent: agent, lit: lit)
+            IconWell(agent: agent)
         }
         .frame(width: 30 + CGFloat(depth - 1) * 7, alignment: .leading)
     }

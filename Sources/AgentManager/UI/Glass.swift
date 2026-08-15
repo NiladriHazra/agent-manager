@@ -193,43 +193,25 @@ struct StatusPill: View {
     }
 }
 
-/// The state dot.
+/// The state dot: a solid bead with one concentric ring.
 ///
-/// A flat filled circle reads as a debug marker. Depth is what makes it look
-/// deliberate: a diffuse halo the colour bleeds into, a saturated core, and a
-/// specular highlight offset toward the top left so it reads as a lit bead
-/// rather than a printed dot.
+/// No blur and no specular highlight. A blurred halo bled past the pill it sits
+/// in and read as a glow around the pill itself, and a white speck on a 6pt
+/// circle just looks like a defect.
 struct StatusDot: View {
     let color: Color
     var size: CGFloat = 7
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(color.opacity(0.32))
-                .frame(width: size * 2.3, height: size * 2.3)
-                .blur(radius: size * 0.55)
-
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [color.opacity(0.95), color],
-                        center: UnitPoint(x: 0.32, y: 0.28),
-                        startRadius: 0,
-                        endRadius: size
-                    )
-                )
-                .overlay(Circle().strokeBorder(.white.opacity(0.28), lineWidth: 0.5))
-                .overlay(alignment: .topLeading) {
-                    Circle()
-                        .fill(.white.opacity(0.75))
-                        .frame(width: size * 0.3, height: size * 0.3)
-                        .blur(radius: 0.4)
-                        .offset(x: size * 0.2, y: size * 0.16)
-                }
-                .frame(width: size, height: size)
-        }
-        .frame(width: size, height: size)
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .overlay(
+                Circle()
+                    .strokeBorder(color.opacity(0.30), lineWidth: size * 0.34)
+                    .frame(width: size * 1.9, height: size * 1.9)
+            )
+            .frame(width: size, height: size)
     }
 }
 
@@ -240,7 +222,6 @@ extension View {
     func glassTab(selected: Bool) -> some View {
         if selected {
             glassCapsule(tint: .white.opacity(0.10))
-                .overlay(Capsule().strokeBorder(.white.opacity(0.20), lineWidth: 0.7))
         } else {
             self
         }

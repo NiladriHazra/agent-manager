@@ -28,7 +28,7 @@ struct MenuContentView: View {
             if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))
                 sidePanel
-                    .frame(width: 300)
+                    .frame(width: 300, alignment: .top)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }

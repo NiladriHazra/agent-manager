@@ -17,6 +17,7 @@ struct DetailPanel: View {
     let rows: AnyView
 
     private let maxHeight: CGFloat = 420
+    private let fade: CGFloat = 14
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -28,11 +29,33 @@ struct DetailPanel: View {
                 rows.padding(.horizontal, 11).padding(.bottom, 11)
             } else {
                 ScrollView {
-                    rows.padding(.horizontal, 11).padding(.bottom, 11)
+                    rows
+                        .padding(.horizontal, 11)
+                        // Room for the fade to eat into, so the first and last
+                        // rows are never cut mid-tile at rest.
+                        .padding(.vertical, fade)
                 }
-                .frame(height: min(CGFloat(count) * 78 + 16, maxHeight))
+                .frame(height: min(CGFloat(count) * 78 + fade * 2, maxHeight))
+                .mask(scrollFade)
+                .scrollIndicators(.never)
             }
         }
+        .padding(.top, 2)
+    }
+
+    /// Content dissolves at both ends instead of being sliced off, so a list
+    /// longer than the panel reads as continuing rather than truncated.
+    private var scrollFade: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: 0.055),
+                .init(color: .black, location: 0.945),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private var header: some View {

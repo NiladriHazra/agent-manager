@@ -39,16 +39,6 @@ enum AgentID: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// True only for marks that are plain white, which would vanish on a lit
-    /// chip and so get re-tinted dark. Marks carrying a brand colour, like
-    /// Claude's orange or Gemini's four-colour star, are left alone.
-    var markIsMonochrome: Bool {
-        switch self {
-        case .gemini, .claude: return false
-        default: return true
-        }
-    }
-
     /// argv[0] basenames that identify a real CLI process for this agent.
     var executableNames: [String] {
         switch self {
