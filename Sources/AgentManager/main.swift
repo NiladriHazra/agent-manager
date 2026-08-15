@@ -8,4 +8,4 @@ setvbuf(stdout, nil, _IOLBF, 0)
 PreferencesCheck.runIfRequested()
 Diagnostics.runIfRequested()
 MainActor.assumeIsolated { SnapshotRenderer.runIfRequested() }
-AgentsViewApp.main()
+AgentManagerApp.main()

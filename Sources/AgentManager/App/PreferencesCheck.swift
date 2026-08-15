@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// `agents-view --check-prefs` exercises the settings round trip against a
+/// `agent-manager --check-prefs` exercises the settings round trip against a
 /// throwaway defaults domain.
 ///
 /// This exists because the first version used `@AppStorage` inside an
@@ -12,7 +12,7 @@ enum PreferencesCheck {
     static func runIfRequested() {
         guard CommandLine.arguments.contains("--check-prefs") else { return }
 
-        let domain = "agents-view.check.\(ProcessInfo.processInfo.processIdentifier)"
+        let domain = "agent-manager.check.\(ProcessInfo.processInfo.processIdentifier)"
         guard let defaults = UserDefaults(suiteName: domain) else {
             print("could not open a test defaults domain")
             exit(1)

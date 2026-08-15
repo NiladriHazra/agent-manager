@@ -54,7 +54,13 @@ final class AppModel: ObservableObject {
             .min { $0.1.remainingPercent < $1.1.remainingPercent }
     }
 
-    var runningCount: Int {
+    /// Working, not merely alive. A session parked at a prompt is not doing
+    /// anything and should not be counted as if it were.
+    var workingCount: Int {
+        snapshots.reduce(0) { $0 + $1.workingSessions.count }
+    }
+
+    var openCount: Int {
         snapshots.reduce(0) { $0 + $1.sessions.count }
     }
 
@@ -65,7 +71,7 @@ final class AppModel: ObservableObject {
             if prefs.hideNotInstalled, snapshot.availability == .notInstalled, snapshot.sessions.isEmpty {
                 return false
             }
-            if !prefs.showIdleAgents, !snapshot.isRunning { return false }
+            if !prefs.showIdleAgents, !snapshot.isWorking { return false }
             return true
         }
     }

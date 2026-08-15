@@ -75,7 +75,7 @@ struct SettingsView: View {
 
     private var about: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("agents-view").font(.title3.bold())
+            Text("agent-manager").font(.title3.bold())
             Text("Which coding agents are running, and how much weekly quota is left.")
                 .foregroundStyle(.secondary)
 

@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>agents-view</string>
+	<string>agent-manager</string>
 	<key>CFBundleDisplayName</key>
-	<string>agents-view</string>
+	<string>agent-manager</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.niladri.agents-view</string>
+	<string>com.niladri.agent-manager</string>
 	<key>CFBundleExecutable</key>
-	<string>AgentsView</string>
+	<string>AgentManager</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

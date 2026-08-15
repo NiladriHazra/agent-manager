@@ -82,6 +82,27 @@ actor UsageIndex {
         return total(agent: agent, since: cutoff)
     }
 
+    /// Most recent write across a session's transcripts, which is the signal
+    /// for whether the agent is actually doing anything.
+    static func lastWrite(in roots: [URL], matching sessionID: String? = nil) -> Date? {
+        var newest: Date?
+        for root in roots {
+            guard let walker = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            ) else { continue }
+            for case let url as URL in walker {
+                guard url.pathExtension == "jsonl" else { continue }
+                if let sessionID, !url.path.contains(sessionID) { continue }
+                let stamp = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate
+                if let stamp, stamp > (newest ?? .distantPast) { newest = stamp }
+            }
+        }
+        return newest
+    }
+
     func sessionMeta(id: String) -> SessionMeta? {
         load()
         return store.titles[id]

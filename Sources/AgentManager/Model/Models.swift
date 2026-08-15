@@ -39,6 +39,15 @@ enum AgentID: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// True when the mark is a single flat colour, so it can be re-tinted dark
+    /// on a lit chip. Multicolour marks (Gemini) must be left alone.
+    var markIsMonochrome: Bool {
+        switch self {
+        case .gemini: return false
+        default: return true
+        }
+    }
+
     /// argv[0] basenames that identify a real CLI process for this agent.
     var executableNames: [String] {
         switch self {
@@ -89,9 +98,20 @@ struct Usage: Equatable {
     }
 }
 
+/// Whether an agent is doing anything. A live process is not the same as a
+/// working one: a session left open at a prompt stays alive for hours, so
+/// activity is judged by how recently its transcript was written.
+enum Activity: Equatable {
+    case working
+    case idle(since: Date?)
+
+    var isWorking: Bool { if case .working = self { return true }; return false }
+}
+
 struct RunningSession: Equatable, Identifiable {
     let pid: Int32
     let agent: AgentID
+    var activity: Activity = .idle(since: nil)
     /// Taken from `--resume <uuid>` when present. This is an exact map to the
     /// transcript; matching by working directory alone gives every concurrent
     /// session in one repo the same title.
@@ -123,12 +143,17 @@ struct AgentSnapshot: Identifiable, Equatable {
     let agent: AgentID
     var availability: Availability = .loading
     var quota: Quota?
+    /// When the quota reading was taken. The vendor only writes it while the
+    /// agent is active, so a number can be hours old and must say so.
+    var quotaObserved: Date?
     var usage: Usage?
     var credits: String?
     var sessions: [RunningSession] = []
 
     var id: String { agent.rawValue }
     var isRunning: Bool { !sessions.isEmpty }
+    var workingSessions: [RunningSession] { sessions.filter { $0.activity.isWorking } }
+    var isWorking: Bool { !workingSessions.isEmpty }
 }
 
 extension String {

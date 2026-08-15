@@ -1,13 +1,15 @@
-# agents-view
+# agent-manager
+
+<img src="docs/icon.png" width="88" align="right" alt="">
 
 A macOS menu bar app that answers two questions about your coding agents: which
-ones are running right now and what each is working on, and how much weekly
-quota is left before one of them stops mid-task.
+ones are **actually working right now** and what each is doing, and how much
+weekly quota is left before one of them stops mid-task.
 
 Native Swift and SwiftUI, no Electron. Reads only local files, sends nothing
 anywhere, and calls no undocumented vendor APIs.
 
-<img src="docs/screenshot.png" width="360" alt="The agents-view dropdown">
+<img src="docs/screenshot.png" width="360" alt="The agent-manager dropdown">
 
 ## Why the rows differ
 
@@ -31,17 +33,25 @@ have left. The two are never mixed.
 Requires macOS 14 or later, and Command Line Tools for the build (no Xcode).
 
 ```sh
-git clone https://github.com/NiladriHazra/agents-view
-cd agents-view
+git clone https://github.com/NiladriHazra/agent-manager
+cd agent-manager
 ./scripts/build.sh
-open dist/agents-view.app
+open dist/agent-manager.app
 ```
 
 The build is ad-hoc signed, so if you move the app somewhere Gatekeeper is
 suspicious of, right-click it and choose Open the first time.
 
-The panel lists only agents that are running right now, since that is the
-question it exists to answer. Idle ones are hidden until you turn them on.
+The panel lists only agents that are actually working. A live process is not
+the same as a working one: a session left open at a prompt stays alive for
+hours, so activity is judged by how recently the agent wrote to its own
+transcript. On the machine this was built against that was the difference
+between "9 running" and the honest answer, 2. Idle sessions are counted
+separately as open, and shown only if you ask for them.
+
+Quota readings carry their age. A vendor only writes its limit while the agent
+runs, so a number can be hours stale; when it is, the row says "as of 27m ago"
+instead of pretending it is current.
 
 ## Settings
 
@@ -76,7 +86,7 @@ No code path can read an entire session file.
 
 ## Notes
 
-- `agents-view --diagnose` prints exactly what each provider read, with timings.
+- `agent-manager --diagnose` prints exactly what each provider read, with timings.
   Use it when a number looks wrong.
 - Claude's cache-read tokens run around a hundred times larger than everything
   else, so they are excluded from the headline figure by default. The setting is

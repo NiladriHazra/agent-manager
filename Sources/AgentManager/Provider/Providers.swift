@@ -7,6 +7,16 @@ protocol AgentProvider {
 
 private let home = FileManager.default.homeDirectoryForCurrentUser
 
+/// A transcript written within this window means the agent is mid-task. Chosen
+/// from measurement: an active session writes every few seconds, while sessions
+/// parked at a prompt sat untouched for 17 to 58 minutes.
+let workingWindow: TimeInterval = 180
+
+func activity(lastWrite: Date?) -> Activity {
+    guard let lastWrite else { return .idle(since: nil) }
+    return Date().timeIntervalSince(lastWrite) <= workingWindow ? .working : .idle(since: lastWrite)
+}
+
 // MARK: - Codex
 
 /// The only agent that writes its real limit to disk. Each session logs
@@ -64,6 +74,16 @@ struct CodexProvider: AgentProvider {
             windowMinutes: primary.window_minutes,
             resetsAt: Date(timeIntervalSince1970: primary.resets_at)
         )
+        // The vendor only writes this while Codex runs, so the reading is only
+        // as fresh as the session that produced it.
+        snapshot.quotaObserved = (try? newest.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate
+        let codexWrite = UsageIndex.lastWrite(in: [root])
+        snapshot.sessions = sessions.map {
+            var copy = $0
+            copy.activity = activity(lastWrite: codexWrite)
+            return copy
+        }
         if let credits = limits.credits, credits.unlimited != true, let balance = credits.balance {
             snapshot.credits = balance
         }
@@ -128,6 +148,10 @@ struct ClaudeProvider: AgentProvider {
             } else {
                 session.title = nil
             }
+            session.activity = activity(
+                lastWrite: UsageIndex.lastWrite(in: [root], matching: session.sessionID)
+                    ?? UsageIndex.lastWrite(in: [root])
+            )
             result.append(session)
         }
         return result
@@ -170,12 +194,18 @@ struct OpenCodeProvider: AgentProvider {
         usage.cost = Double(row[4])
         snapshot.usage = usage
 
+        let openCodeWrite = (try? FileManager.default.attributesOfItem(atPath: dbPath)[.modificationDate] as? Date) ?? nil
+        snapshot.sessions = sessions.map {
+            var copy = $0
+            copy.activity = activity(lastWrite: openCodeWrite)
+            return copy
+        }
         if !sessions.isEmpty,
            let title = SQLiteReader.queryRow(
                path: dbPath,
                sql: "SELECT title FROM session ORDER BY time_updated DESC LIMIT 1;"
            )?.first {
-            snapshot.sessions = sessions.map {
+            snapshot.sessions = snapshot.sessions.map {
                 var copy = $0
                 copy.title = title
                 return copy

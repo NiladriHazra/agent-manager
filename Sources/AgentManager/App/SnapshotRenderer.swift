@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// `agents-view --snapshot <path>` renders the dropdown to a PNG offscreen.
+/// `agent-manager --snapshot <path>` renders the dropdown to a PNG offscreen.
 ///
 /// Exists so the interface can be checked against real data without clicking
 /// the menu bar, which needs Accessibility permission that a build machine or
