@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AgentsViewApp: App {
+struct AgentManagerApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// `agents-view --snapshot <path>` renders the dropdown to a PNG offscreen.
+/// `agent-manager --snapshot <path>` renders the dropdown to a PNG offscreen.
 ///
 /// Exists so the interface can be checked against real data without clicking
 /// the menu bar, which needs Accessibility permission that a build machine or
@@ -32,14 +32,11 @@ enum SnapshotRenderer {
     }
 
     private static func render(model: AppModel, to output: URL) {
-        // ImageRenderer does not lay out ScrollView content offscreen, so the
-        // rows are drawn in a plain stack here. The live menu keeps the scroll.
-        let view = VStack(alignment: .leading, spacing: 6) {
-            ForEach(model.visibleSnapshots) { AgentRowView(snapshot: $0) }
-        }
-        .padding(10)
-        .frame(width: 320)
-        .background(Theme.surface)
+        RenderMode.isOffscreen = true
+        // Renders the real panel, so what this writes is what the menu shows.
+        // The window material cannot be sampled offscreen, so it is stood in
+        // with the surface colour here.
+        let view = MenuContentView(model: model).background(Theme.surface)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
 
