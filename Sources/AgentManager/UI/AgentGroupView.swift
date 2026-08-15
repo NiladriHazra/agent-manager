@@ -60,7 +60,7 @@ struct AgentGroupView: View {
                     Spacer(minLength: 8)
 
                     if working > 0 {
-                        StatusPill(text: "\(working) working", tone: .positive, showsDot: true)
+                        StatusPill(text: "\(working) running", tone: .positive, indicator: .typing)
                     } else {
                         StatusPill(text: "\(group.sessions.count) open", tone: .neutral)
                     }

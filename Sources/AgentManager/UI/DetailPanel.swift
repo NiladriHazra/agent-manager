@@ -73,7 +73,7 @@ struct DetailPanel: View {
             Spacer()
 
             if activeCount > 0 {
-                StatusPill(text: "\(activeCount) active", tone: .positive, showsDot: true)
+                StatusPill(text: "\(activeCount) active", tone: .positive, indicator: .typing)
                     .scaleEffect(0.9, anchor: .trailing)
             }
 

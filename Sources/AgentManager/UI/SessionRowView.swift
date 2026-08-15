@@ -34,7 +34,7 @@ struct SessionRowView: View {
                 }
 
                 Spacer(minLength: 8)
-                StatusPill(text: state.text, tone: state.tone, showsDot: state.dot)
+                StatusPill(text: state.text, tone: state.tone, indicator: state.indicator)
             }
 
             metadata
@@ -96,7 +96,7 @@ struct SessionRowView: View {
                     .frame(height: 15)
                     .background(Capsule().fill(Color.white.opacity(0.10)))
                 if activeSubAgents > 0 {
-                    StatusPill(text: "\(activeSubAgents) active", tone: .positive, showsDot: true)
+                    StatusPill(text: "\(activeSubAgents) active", tone: .positive, indicator: .typing)
                         .scaleEffect(0.88, anchor: .leading)
                 }
                 Spacer(minLength: 0)
@@ -107,11 +107,11 @@ struct SessionRowView: View {
         .padding(.top, 11)
     }
 
-    private var state: (text: String, tone: StatusPill.Tone, dot: Bool) {
+    private var state: (text: String, tone: StatusPill.Tone, indicator: StatusPill.Indicator) {
         switch session.activity {
-        case .working: return ("working", .positive, true)
-        case .waiting: return ("waiting", .warning, true)
-        case .idle: return ("open", .neutral, false)
+        case .working: return ("running", .positive, .typing)
+        case .waiting: return ("waiting", .warning, .shimmer)
+        case .idle: return ("open", .neutral, .none)
         }
     }
 
@@ -164,10 +164,13 @@ struct SubAgentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            StatusDot(
-                color: subAgent.isWorking ? StatusPill.Tone.positive.dot : .white.opacity(0.28),
-                size: 6
-            )
+            Group {
+                if subAgent.isWorking {
+                    TypingLoader(color: StatusPill.Tone.positive.dot, dot: 3.5)
+                } else {
+                    StatusDot(color: .white.opacity(0.28), size: 6)
+                }
+            }
             .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 5) {

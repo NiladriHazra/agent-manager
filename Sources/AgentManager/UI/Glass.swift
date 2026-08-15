@@ -160,18 +160,29 @@ struct StatusPill: View {
         }
     }
 
+    /// What sits before the label. A live state gets motion instead of a dot,
+    /// ported from prompt-kit's `typing` and `text-shimmer` loaders.
+    enum Indicator {
+        case none
+        case dot
+        /// Three dots cycling, for something actively producing output.
+        case typing
+        /// No leading mark; the label itself shimmers, for something parked.
+        case shimmer
+    }
+
     let text: String
     let tone: Tone
-    var showsDot = false
+    var indicator: Indicator = .none
 
     var body: some View {
         HStack(spacing: 5) {
-            if showsDot {
-                StatusDot(color: tone.dot)
+            switch indicator {
+            case .dot: StatusDot(color: tone.dot)
+            case .typing: TypingLoader(color: tone.dot)
+            case .none, .shimmer: EmptyView()
             }
-            Text(text)
-                .font(BrandFont.body(10.5, weight: .medium))
-                .foregroundStyle(.white)
+            label
         }
         .padding(.horizontal, 9)
         .frame(height: 21)
@@ -190,6 +201,78 @@ struct StatusPill: View {
             )
         )
         .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        let font = BrandFont.body(10.5, weight: .medium)
+        if case .shimmer = indicator {
+            ShimmerText(text: text, font: font)
+        } else {
+            Text(text).font(font).foregroundStyle(.white)
+        }
+    }
+}
+
+/// prompt-kit's `typing` loader: three dots rising and fading in sequence.
+struct TypingLoader: View {
+    let color: Color
+    var dot: CGFloat = 4
+
+    @State private var phase = 0
+
+    var body: some View {
+        HStack(spacing: dot * 0.6) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(color)
+                    .frame(width: dot, height: dot)
+                    .opacity(phase == index ? 1 : 0.28)
+                    .offset(y: phase == index ? -dot * 0.35 : 0)
+            }
+        }
+        .task {
+            guard !RenderMode.isOffscreen else { return }
+            // A discrete cycle rather than three overlapping repeatForever
+            // animations, which drift out of step over a long-running panel.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(260))
+                withAnimation(.easeInOut(duration: 0.24)) { phase = (phase + 1) % 3 }
+            }
+        }
+    }
+}
+
+/// prompt-kit's `text-shimmer`: a highlight travelling across the glyphs.
+struct ShimmerText: View {
+    let text: String
+    let font: Font
+
+    @State private var travel = -0.6
+
+    var body: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.45), location: 0),
+                        .init(color: .white, location: 0.5),
+                        .init(color: .white.opacity(0.45), location: 1),
+                    ],
+                    startPoint: UnitPoint(x: travel, y: 0.5),
+                    endPoint: UnitPoint(x: travel + 0.6, y: 0.5)
+                )
+            )
+            .task {
+                guard !RenderMode.isOffscreen else {
+                    travel = 0.2
+                    return
+                }
+                withAnimation(.linear(duration: 1.9).repeatForever(autoreverses: false)) {
+                    travel = 1.6
+                }
+            }
     }
 }
 
