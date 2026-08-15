@@ -18,9 +18,9 @@ is honest about that rather than inventing numbers:
 
 | Agent | Running and activity | Tokens | Quota |
 | --- | --- | --- | --- |
-| Codex | yes | yes | **real limit**, straight from its own session log |
-| Claude Code | yes, with the session title | yes | none published |
-| OpenCode | yes, with the session title | yes, with spend | none published |
+| Codex | yes | yes | **real limit**, straight from its own session log, plus credit balance |
+| Claude Code | yes, with the session title | yes, plus per-chat context | none published |
+| OpenCode | yes, with the session title | yes, per session, with spend and model | none published |
 | Grok | yes | yes, with spend | none published |
 | Cursor, Gemini, Antigravity, Hermes | yes | nothing on disk | none published |
 
@@ -29,6 +29,42 @@ wrote a limit to disk. Everything else is labelled `usage`, meaning tokens
 counted from local transcripts, which is what you spent rather than what you
 have left. The two are never mixed. Agents that record nothing show presence
 only; no number is invented to fill the column.
+
+## Per-chat detail
+
+Where an agent records enough, a session row also carries what that one chat
+has spent and how full its context is:
+
+- **Context until compact** — the tokens the model held on its most recent
+  turn, against its window. It climbs through a long conversation and drops the
+  moment the agent compacts, so it answers "how much room is left" directly.
+  The window tier is inferred from the reading itself, since the transcript
+  records a model family but not which tier the session opened with.
+- **Input, output and thinking tokens** for that chat, plus its turn count
+- **Model name**, so you can see which sessions are on which model
+- **Spend**, for the two agents that publish a price
+
+## Settings
+
+Right-click the menu bar item for Settings, Refresh and Quit. The Settings
+window has four sections:
+
+- **General** — menu bar display, refresh interval, low-quota thresholds,
+  launch at login
+- **Agents** — which agents appear at all
+- **Readings** — per agent, which of its readings a row may draw. Each agent is
+  offered only what it genuinely writes to disk, so no switch here is
+  decorative: Codex has a quota switch, Claude has context and per-chat tokens,
+  OpenCode and Grok have spend.
+- **About**
+
+## Clicking a session
+
+Clicking a session row raises the terminal that owns it. The owning app is
+found by walking up the parent chain from the agent, through its shell, to the
+first process inside an `.app` bundle. Terminal.app and iTerm2 also expose a
+tab's `tty`, so for those two the exact tab is selected; other terminals can
+only be brought to the front.
 
 ## Installing
 
