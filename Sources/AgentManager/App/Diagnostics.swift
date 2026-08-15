@@ -66,7 +66,8 @@ enum Diagnostics {
                 case .waiting(let since): state = "WAITING " + (since.map { QuotaBar.ago($0) } ?? "")
                 case .idle(let since): state = "idle " + (since.map { QuotaBar.ago($0) } ?? "(unknown)")
                 }
-                print("            \u{21B3} \(pad(state, 16))\(session.activityLine)")
+                let focus = session.canFocus ? "focusable" : "no-terminal"
+                print("            \u{21B3} \(pad(state, 16))\(pad(session.activityLine, 34))\(pad(session.tty ?? "-", 14))\(focus)")
             }
         }
     }

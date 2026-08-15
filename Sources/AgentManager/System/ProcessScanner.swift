@@ -35,6 +35,11 @@ enum ProcessScanner {
     static func runningAgents() -> [RunningSession] {
         let procs = allProcesses()
         let byPid = Dictionary(uniqueKeysWithValues: procs.map { ($0.pid, $0) })
+        // The walk to an owning terminal crosses shells and app bundles, which
+        // the agent filter drops, so it needs the full table.
+        let everything = Dictionary(
+            uniqueKeysWithValues: allProcessesUnfiltered().map { ($0.pid, $0) }
+        )
 
         var matches: [(Proc, AgentID)] = []
         for proc in procs {
@@ -68,7 +73,8 @@ enum ProcessScanner {
                 title: nil,
                 cwd: cwd(of: proc.pid),
                 branch: nil,
-                tty: proc.tty
+                tty: proc.tty,
+                canFocus: TerminalFocus.canFocus(pid: proc.pid, in: everything)
             )
         }
     }

@@ -12,6 +12,8 @@ struct WindowBar: View {
     let weekFraction: Double
     let dayIsQuota: Bool
     let weekIsQuota: Bool
+    /// The agent's own colour, measured from its mark.
+    let tint: Color
 
     private let height: CGFloat = 5
 
@@ -30,9 +32,12 @@ struct WindowBar: View {
                 Capsule()
                     .fill(
                         LinearGradient(
+                            // A vendor-published limit is drawn at full
+                            // strength; locally counted tokens are drawn in the
+                            // same hue but muted, so the two never look alike.
                             colors: isQuota
-                                ? [Theme.accentLight, Theme.accent]
-                                : [.white.opacity(0.34), .white.opacity(0.22)],
+                                ? [tint.opacity(0.95), tint]
+                                : [tint.opacity(0.5), tint.opacity(0.34)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )

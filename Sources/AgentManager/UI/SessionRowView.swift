@@ -38,6 +38,7 @@ struct SessionRowView: View {
             metadata
 
             UsagePanel(
+                agent: agent,
                 quota: quota,
                 quotaObserved: quotaObserved,
                 usage: usage,
@@ -57,8 +58,11 @@ struct SessionRowView: View {
         // The row is the control: clicking it raises the terminal that owns
         // this session, so a listed session is always reachable.
         .contentShape(Rectangle())
-        .onTapGesture { TerminalFocus.focus(pid: session.pid, tty: session.tty) }
-        .help("Show this session's terminal")
+        .onTapGesture {
+            guard session.canFocus else { return }
+            TerminalFocus.focus(pid: session.pid, tty: session.tty)
+        }
+        .help(session.canFocus ? "Show this session's terminal" : "")
     }
 
     /// Branch, working directory and pid, set in monospace because they are

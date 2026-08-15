@@ -75,6 +75,7 @@ struct AgentGroupView: View {
             .buttonStyle(.plain)
 
             UsagePanel(
+                agent: group.agent,
                 quota: group.quota,
                 quotaObserved: group.quotaObserved,
                 usage: group.usage,

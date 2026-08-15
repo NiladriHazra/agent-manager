@@ -8,6 +8,7 @@ import SwiftUI
 /// vendor publishes a real limit for a window, that half switches to the accent
 /// colour and fills to the actual percentage used instead.
 struct UsagePanel: View {
+    let agent: AgentID
     let quota: Quota?
     let quotaObserved: Date?
     let usage: Usage?
@@ -40,7 +41,8 @@ struct UsagePanel: View {
                 dayFraction: dayFraction,
                 weekFraction: weekFraction,
                 dayIsQuota: dayIsQuota,
-                weekIsQuota: weekIsQuota
+                weekIsQuota: weekIsQuota,
+                tint: LogoTint.color(for: agent)
             )
 
             if let quota {

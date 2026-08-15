@@ -29,8 +29,10 @@ struct AgentLogo: View {
     @MainActor
     private static func load(_ name: String) -> NSImage? {
         if let cached = cache[name] { return cached }
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg"),
-              let image = NSImage(contentsOf: url) else { return nil }
+        // Most marks are SVG; Hermes ships only as a bitmap.
+        let url = Bundle.module.url(forResource: name, withExtension: "svg")
+            ?? Bundle.module.url(forResource: name, withExtension: "png")
+        guard let url, let image = NSImage(contentsOf: url) else { return nil }
         image.size = NSSize(width: 38, height: 38)
         cache[name] = image
         return image

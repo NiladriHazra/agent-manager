@@ -122,6 +122,9 @@ struct RunningSession: Equatable, Identifiable {
     var cwd: String?
     var branch: String?
     var tty: String?
+    /// Whether an owning terminal app was found. A row that cannot be focused
+    /// must not offer a click that does nothing.
+    var canFocus = false
     var subAgents: [SubAgent] = []
 
     var id: Int32 { pid }

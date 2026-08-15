@@ -29,14 +29,20 @@ enum TerminalFocus {
         }
     }
 
-    static func canFocus(pid: Int32) -> Bool {
-        owningApp(of: pid) != nil
+    /// Takes the table the caller already built: the scan runs every few
+    /// seconds and must not enumerate every process once per session.
+    static func canFocus(pid: Int32, in table: [Int32: ProcessScanner.Proc]) -> Bool {
+        owningApp(of: pid, table: table) != nil
     }
 
     private static func owningApp(of pid: Int32) -> URL? {
-        let byPid = Dictionary(
+        let table = Dictionary(
             uniqueKeysWithValues: ProcessScanner.allProcessesUnfiltered().map { ($0.pid, $0) }
         )
+        return owningApp(of: pid, table: table)
+    }
+
+    private static func owningApp(of pid: Int32, table byPid: [Int32: ProcessScanner.Proc]) -> URL? {
         var current = byPid[pid]?.ppid ?? 0
         var hops = 0
         while current > 1, hops < 24 {
