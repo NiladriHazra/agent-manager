@@ -70,17 +70,22 @@ enum ProcessScanner {
     }
 
     static func classify(_ proc: Proc) -> AgentID? {
-        let name = proc.name
-        guard !shellNames.contains(name) else { return nil }
-
         let exec = proc.executable
+        let names = [
+            proc.name,
+            proc.argv.first.map { ($0 as NSString).lastPathComponent } ?? "",
+        ]
+        // Only a bare interpreter with no agent name anywhere is a shell.
+        guard names.contains(where: { !shellNames.contains($0) }) else { return nil }
         // Anything shipped inside an .app bundle is a GUI helper, not the CLI.
         guard !exec.contains(".app/Contents/"), !exec.hasPrefix("/Applications/") else { return nil }
 
         let joined = proc.argv.joined(separator: " ")
         for fragment in rejectedArgFragments where joined.contains(fragment) { return nil }
 
-        return AgentID.allCases.first { $0.executableNames.contains(name) }
+        return AgentID.allCases.first { agent in
+            names.contains { agent.executableNames.contains($0) }
+        }
     }
 
     /// Working directory of a pid. Same-user processes need no entitlement.
@@ -132,9 +137,13 @@ enum ProcessScanner {
             while cursor < size, scratch[cursor] != 0 { cursor += 1 }
             let pathBytes = scratch[MemoryLayout<Int32>.size..<cursor].map { UInt8(bitPattern: $0) }
             guard let execPath = String(bytes: pathBytes, encoding: .utf8) else { continue }
-            guard wanted.contains((execPath as NSString).lastPathComponent) else { continue }
-
             let argv = parseArguments(scratch, size: size)
+
+            // A wrapper script keeps the tool's name in argv[0] even though the
+            // kernel reports the interpreter it exec'd.
+            let execName = (execPath as NSString).lastPathComponent
+            let argvName = argv.first.map { ($0 as NSString).lastPathComponent } ?? ""
+            guard wanted.contains(execName) || wanted.contains(argvName) else { continue }
             result.append(Proc(
                 pid: entry.kp_proc.p_pid,
                 ppid: entry.kp_eproc.e_ppid,
