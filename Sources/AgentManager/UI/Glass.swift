@@ -50,6 +50,35 @@ extension View {
     func glassTile(radius: CGFloat = 20, highlighted: Bool = false) -> some View {
         modifier(GlassTile(radius: radius, highlighted: highlighted))
     }
+
+    /// Real glass for a capsule, so pills and chips get the same treatment as
+    /// tiles rather than a painted-on approximation.
+    @ViewBuilder
+    func glassCapsule(tint: Color? = nil) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            if let tint {
+                self.glassEffect(.regular.tint(tint), in: .capsule)
+            } else {
+                self.glassEffect(.regular, in: .capsule)
+            }
+        } else {
+            self.background(
+                Capsule().fill(.ultraThinMaterial)
+                    .overlay(Capsule().fill(tint ?? .clear))
+            )
+        }
+    }
+
+    /// Groups adjacent glass so shapes merge and share refraction the way
+    /// Apple's own controls do, rather than reading as separate panes.
+    @ViewBuilder
+    func glassGroup(spacing: CGFloat = 10) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            GlassEffectContainer(spacing: spacing) { self }
+        } else {
+            self
+        }
+    }
 }
 
 /// The Klipeo StatusPill, transcribed exactly: a tonal capsule with white text,
@@ -118,29 +147,7 @@ struct StatusPill: View {
         }
         .padding(.horizontal, 9)
         .frame(height: 21)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().fill(tone.fill))
-                .overlay(
-                    // inset 0 -6px 12px rgba(0,0,0,0.35), pooling at the bottom.
-                    Capsule().fill(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.35)],
-                            startPoint: .center, endPoint: .bottom
-                        )
-                    )
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        LinearGradient(
-                            colors: [tone.topHighlight, tone.border],
-                            startPoint: .top, endPoint: .bottom
-                        ),
-                        lineWidth: 0.8
-                    )
-                )
-        }
-        .clipShape(Capsule())
+        .glassCapsule(tint: tone.fill)
+        .overlay(Capsule().strokeBorder(tone.border, lineWidth: 0.8))
     }
 }
