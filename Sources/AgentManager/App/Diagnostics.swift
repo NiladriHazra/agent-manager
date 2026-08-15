@@ -38,18 +38,7 @@ enum Diagnostics {
             print("           pid \(session.pid)  \(session.agent.rawValue)  cwd=\(session.cwd ?? "?")")
         }
 
-        let providers: [AgentProvider] = [
-            CodexProvider(),
-            ClaudeProvider(index: index),
-            OpenCodeProvider(),
-            PresenceProvider(agent: .cursor, installedPaths: [home.appendingPathComponent(".cursor").path]),
-            PresenceProvider(agent: .gemini, installedPaths: [home.appendingPathComponent(".gemini").path]),
-            PresenceProvider(agent: .antigravity, installedPaths: [
-                home.appendingPathComponent("Library/Application Support/Antigravity").path,
-            ]),
-            PresenceProvider(agent: .grok, installedPaths: [home.appendingPathComponent(".grok").path]),
-            PresenceProvider(agent: .hermes, installedPaths: [home.appendingPathComponent(".hermes").path]),
-        ]
+        let providers = allProviders(index: index)
 
         print("")
         for provider in providers {

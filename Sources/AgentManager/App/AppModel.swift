@@ -20,27 +20,7 @@ final class AppModel: ObservableObject {
     private let home = FileManager.default.homeDirectoryForCurrentUser
 
     init() {
-        providers = [
-            CodexProvider(),
-            ClaudeProvider(index: index),
-            OpenCodeProvider(),
-            PresenceProvider(agent: .cursor, installedPaths: [
-                home.appendingPathComponent(".cursor").path,
-                "/Applications/Cursor.app",
-            ]),
-            PresenceProvider(agent: .gemini, installedPaths: [
-                home.appendingPathComponent(".gemini").path,
-            ]),
-            PresenceProvider(agent: .antigravity, installedPaths: [
-                home.appendingPathComponent("Library/Application Support/Antigravity").path,
-            ]),
-            PresenceProvider(agent: .grok, installedPaths: [
-                home.appendingPathComponent(".grok").path,
-            ]),
-            PresenceProvider(agent: .hermes, installedPaths: [
-                home.appendingPathComponent(".hermes").path,
-            ]),
-        ]
+        providers = allProviders(index: index)
         snapshots = providers.map { AgentSnapshot(agent: $0.agent) }
         startTimer()
     }

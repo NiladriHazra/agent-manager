@@ -22,7 +22,7 @@ enum ProcessScanner {
     /// Helper binaries and wrappers that mention an agent but are not one.
     private static let rejectedArgFragments = [
         "--type=", "app-server", "code-mode-host", "mcp-server", "--listen",
-        "remote-control", "crashpad", "ComputerUse",
+        "remote-control", "crashpad", "ComputerUse", "gateway run", "-m hermes_cli",
     ]
 
     private static let shellNames: Set<String> = [
@@ -69,12 +69,20 @@ enum ProcessScanner {
         }
     }
 
+    /// Names a process might be known by. A wrapper script keeps the tool in
+    /// argv[0], and an interpreter launch (`python3 .../bin/hermes`) puts it in
+    /// argv[1], so all of them are considered.
+    static func candidateNames(_ execPath: String, _ argv: [String]) -> [String] {
+        var names = [(execPath as NSString).lastPathComponent]
+        for arg in argv.prefix(2) where !arg.hasPrefix("-") {
+            names.append((arg as NSString).lastPathComponent)
+        }
+        return names
+    }
+
     static func classify(_ proc: Proc) -> AgentID? {
         let exec = proc.executable
-        let names = [
-            proc.name,
-            proc.argv.first.map { ($0 as NSString).lastPathComponent } ?? "",
-        ]
+        let names = candidateNames(exec, proc.argv)
         // Only a bare interpreter with no agent name anywhere is a shell.
         guard names.contains(where: { !shellNames.contains($0) }) else { return nil }
         // Anything shipped inside an .app bundle is a GUI helper, not the CLI.
@@ -141,9 +149,7 @@ enum ProcessScanner {
 
             // A wrapper script keeps the tool's name in argv[0] even though the
             // kernel reports the interpreter it exec'd.
-            let execName = (execPath as NSString).lastPathComponent
-            let argvName = argv.first.map { ($0 as NSString).lastPathComponent } ?? ""
-            guard wanted.contains(execName) || wanted.contains(argvName) else { continue }
+            guard wanted.contains(where: { candidateNames(execPath, argv).contains($0) }) else { continue }
             result.append(Proc(
                 pid: entry.kp_proc.p_pid,
                 ppid: entry.kp_eproc.e_ppid,

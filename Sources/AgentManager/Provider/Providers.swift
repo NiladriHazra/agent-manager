@@ -7,6 +7,30 @@ protocol AgentProvider {
 
 private let home = FileManager.default.homeDirectoryForCurrentUser
 
+/// The one provider list. Diagnostics used to keep its own copy, which meant a
+/// provider could be wired into the app and still report nothing when checked.
+func allProviders(index: UsageIndex) -> [AgentProvider] {
+    [
+        CodexProvider(),
+        ClaudeProvider(index: index),
+        OpenCodeProvider(),
+        GrokProvider(),
+        PresenceProvider(agent: .cursor, installedPaths: [
+            home.appendingPathComponent(".cursor").path,
+            "/Applications/Cursor.app",
+        ]),
+        PresenceProvider(agent: .gemini, installedPaths: [
+            home.appendingPathComponent(".gemini").path,
+        ]),
+        PresenceProvider(agent: .antigravity, installedPaths: [
+            home.appendingPathComponent("Library/Application Support/Antigravity").path,
+        ]),
+        PresenceProvider(agent: .hermes, installedPaths: [
+            home.appendingPathComponent(".hermes").path,
+        ]),
+    ]
+}
+
 /// A transcript written within this window means the agent is mid-task. Chosen
 /// from measurement: an active session writes every few seconds, while sessions
 /// parked at a prompt sat untouched for 17 to 58 minutes.
@@ -78,6 +102,9 @@ struct CodexProvider: AgentProvider {
         // as fresh as the session that produced it.
         snapshot.quotaObserved = (try? newest.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate
+        snapshot.usage = TokenSources.codex(root: root, since: Date().addingTimeInterval(-7 * 86_400))
+        snapshot.usageToday = TokenSources.codex(root: root, since: Date().addingTimeInterval(-86_400))
+
         let codexWrite = UsageIndex.lastWrite(in: [root])
         snapshot.sessions = sessions.map {
             var copy = $0
@@ -237,6 +264,39 @@ struct OpenCodeProvider: AgentProvider {
         }
         snapshot.availability = .ready
         return snapshot
+    }
+}
+
+// MARK: - Grok
+
+/// Grok logs one `usage` block per turn, per working directory, and is the only
+/// agent besides OpenCode that records what a turn cost.
+struct GrokProvider: AgentProvider {
+    let agent = AgentID.grok
+    private let root = home.appendingPathComponent(".grok/sessions")
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        guard FileManager.default.fileExists(atPath: root.path) else {
+            snapshot.availability = installedElsewhere || !sessions.isEmpty ? .ready : .notInstalled
+            return snapshot
+        }
+
+        snapshot.usage = TokenSources.grok(root: root, since: Date().addingTimeInterval(-7 * 86_400))
+        snapshot.usageToday = TokenSources.grok(root: root, since: Date().addingTimeInterval(-86_400))
+
+        let lastWrite = UsageIndex.lastWrite(in: [root])
+        snapshot.sessions = sessions.map {
+            var copy = $0
+            copy.activity = activity(lastWrite: lastWrite)
+            return copy
+        }
+        snapshot.availability = .ready
+        return snapshot
+    }
+
+    private var installedElsewhere: Bool {
+        FileManager.default.fileExists(atPath: home.appendingPathComponent(".grok").path)
     }
 }
 
