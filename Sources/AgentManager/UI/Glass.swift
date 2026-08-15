@@ -314,41 +314,45 @@ struct StatusDot: View {
 /// stays open, which looks broken rather than alive.
 struct WaveLoader: View {
     let color: Color
+    /// An idle row still waves, slower and shallower. A frozen row read as a
+    /// broken component; the colour and the label carry the state instead.
     var animated = true
-    var barWidth: CGFloat = 1.6
-    var height: CGFloat = 11
+    var barWidth: CGFloat = 2
+    var height: CGFloat = 14
 
     private let bars = 5
-    private let period = 1.1
+
+    private var period: Double { animated ? 1.0 : 2.6 }
+    private var floor: Double { animated ? 0.25 : 0.35 }
+    private var swing: Double { animated ? 0.75 : 0.3 }
 
     var body: some View {
-        if animated, !RenderMode.isOffscreen {
+        if RenderMode.isOffscreen {
+            shape { index in index == 2 ? 1 : (index % 2 == 0 ? 0.45 : 0.75) }
+        } else {
             TimelineView(.animation) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                     .truncatingRemainder(dividingBy: period) / period
                 shape { index in
-                    let phase = t * 2 * .pi - Double(index) * 0.7
-                    return 0.35 + 0.65 * (sin(phase) + 1) / 2
+                    let phase = t * 2 * .pi - Double(index) * 0.8
+                    return floor + swing * (sin(phase) + 1) / 2
                 }
             }
-        } else {
-            // At rest the bars stay, flattened: the row still reads as the same
-            // component rather than swapping to a different mark.
-            shape { index in index == 2 ? 0.45 : 0.3 }
         }
     }
 
     private func shape(_ scale: @escaping (Int) -> Double) -> some View {
-        HStack(alignment: .center, spacing: barWidth * 0.9) {
+        HStack(alignment: .center, spacing: barWidth * 0.8) {
             ForEach(0..<bars, id: \.self) { index in
                 Capsule()
                     .fill(color)
-                    .frame(width: barWidth, height: height * scale(index))
+                    .frame(width: barWidth, height: max(barWidth, height * scale(index)))
             }
         }
-        .frame(width: CGFloat(bars) * barWidth * 1.9, height: height)
+        .frame(width: CGFloat(bars) * barWidth * 1.8, height: height)
     }
 }
+
 
 extension View {
     /// Ties a glass shape to an identity so SwiftUI morphs it — the selected
