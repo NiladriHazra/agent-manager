@@ -126,12 +126,14 @@ struct StackedIcons: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // The discs behind carry the same mark, smaller and dimmer, with no
-            // chrome rim of their own so the stack reads as depth rather than
-            // three logos fighting for the same 30 points.
+            // The discs behind are flat and opaque, not glass: translucent
+            // discs stacked on translucent discs just smear into one blur, and
+            // the front logo bled through them.
             ForEach(1..<max(depth, 1), id: \.self) { index in
-                IconWell(agent: agent, lit: false, bezel: false, size: 30 - CGFloat(index) * 3)
-                    .opacity(0.5 - Double(index) * 0.14)
+                Circle()
+                    .fill(Theme.surface)
+                    .overlay(Circle().strokeBorder(.white.opacity(0.16 - Double(index) * 0.04), lineWidth: 0.8))
+                    .frame(width: 30 - CGFloat(index) * 3, height: 30 - CGFloat(index) * 3)
                     .offset(x: CGFloat(index) * 7)
             }
             IconWell(agent: agent, lit: lit)
