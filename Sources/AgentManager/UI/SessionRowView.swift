@@ -13,8 +13,6 @@ struct SessionRowView: View {
     let onInspect: () -> Void
 
     @ObservedObject private var prefs = Preferences.shared
-    @State private var hovered = false
-
     private var working: Bool { session.activity.isWorking }
     private var activeSubAgents: Int { session.subAgents.filter(\.isWorking).count }
 
@@ -51,15 +49,15 @@ struct SessionRowView: View {
                     .padding(.top, 8)
             } else {
                 WindowLine(today: usageToday, week: usage, includeCacheReads: prefs.includeCacheReads)
-                    .padding(.top, 10)
+                    .padding(.top, 8)
             }
 
             if !session.subAgents.isEmpty { subAgentToggle }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .glassTile(radius: 18, highlighted: hovered || isInspecting)
-        .onHover { hovered = $0 }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .glassTile(radius: 16, highlighted: isInspecting)
     }
 
     /// Branch, working directory and pid, set in monospace because they are
@@ -77,7 +75,7 @@ struct SessionRowView: View {
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.28))
         }
-        .padding(.top, 10)
+        .padding(.top, 8)
     }
 
     private var subAgentToggle: some View {
@@ -104,7 +102,7 @@ struct SessionRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.top, 11)
+        .padding(.top, 8)
     }
 
     private var state: (text: String, tone: StatusPill.Tone, indicator: StatusPill.Indicator) {
@@ -160,7 +158,6 @@ private struct Chip: View {
 /// wrote. Everything else would be noise at this size.
 struct SubAgentRow: View {
     let subAgent: SubAgent
-    @State private var hovered = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -201,8 +198,7 @@ struct SubAgentRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 11)
         .padding(.vertical, 9)
-        .glassTile(radius: 14, highlighted: hovered || subAgent.isWorking)
-        .onHover { hovered = $0 }
+        .glassTile(radius: 14, highlighted: subAgent.isWorking)
     }
 }
 

@@ -248,31 +248,36 @@ struct ShimmerText: View {
     let text: String
     let font: Font
 
-    @State private var travel = -0.6
+    private let period = 2.0
 
     var body: some View {
-        Text(text)
-            .font(font)
-            .foregroundStyle(
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(0.45), location: 0),
-                        .init(color: .white, location: 0.5),
-                        .init(color: .white.opacity(0.45), location: 1),
-                    ],
-                    startPoint: UnitPoint(x: travel, y: 0.5),
-                    endPoint: UnitPoint(x: travel + 0.6, y: 0.5)
+        if RenderMode.isOffscreen {
+            base.foregroundStyle(.white)
+        } else {
+            // Driven by TimelineView, not withAnimation: a gradient's
+            // startPoint/endPoint are not animatable properties, so the
+            // implicit-animation version silently rendered a static label.
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: period) / period
+                let travel = t * 2.4 - 0.7
+                base.foregroundStyle(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.4), location: 0),
+                            .init(color: .white, location: 0.5),
+                            .init(color: .white.opacity(0.4), location: 1),
+                        ],
+                        startPoint: UnitPoint(x: travel, y: 0.5),
+                        endPoint: UnitPoint(x: travel + 0.7, y: 0.5)
+                    )
                 )
-            )
-            .task {
-                guard !RenderMode.isOffscreen else {
-                    travel = 0.2
-                    return
-                }
-                withAnimation(.linear(duration: 1.9).repeatForever(autoreverses: false)) {
-                    travel = 1.6
-                }
             }
+        }
+    }
+
+    private var base: some View {
+        Text(text).font(font)
     }
 }
 

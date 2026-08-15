@@ -17,7 +17,7 @@ struct DetailPanel: View {
     let rows: AnyView
 
     private let maxHeight: CGFloat = 420
-    private let fade: CGFloat = 14
+    private let fade: CGFloat = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,12 +35,11 @@ struct DetailPanel: View {
                         // rows are never cut mid-tile at rest.
                         .padding(.vertical, fade)
                 }
-                .frame(height: min(CGFloat(count) * 78 + fade * 2, maxHeight))
+                .frame(height: min(CGFloat(count) * 74 + fade * 2, maxHeight))
                 .mask(scrollFade)
                 .scrollIndicators(.never)
             }
         }
-        .padding(.top, 2)
     }
 
     /// Content dissolves at both ends instead of being sliced off, so a list
@@ -87,7 +86,7 @@ struct DetailPanel: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 13)
-        .padding(.top, 12)
-        .padding(.bottom, 9)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
     }
 }

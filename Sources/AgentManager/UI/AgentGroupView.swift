@@ -11,7 +11,6 @@ struct AgentGroupView: View {
     /// state they held would be thrown away mid-interaction.
     @Binding var detail: DetailTarget?
     @ObservedObject private var prefs = Preferences.shared
-    @State private var hovered = false
 
     private var expanded: Bool { detail == .sessions(group.agent) }
 
@@ -99,9 +98,9 @@ struct AgentGroupView: View {
             }
 
         }
-        .padding(14)
-        .glassTile(radius: 18, highlighted: hovered || expanded, interactive: true)
-        .onHover { hovered = $0 }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .glassTile(radius: 16, highlighted: expanded, interactive: true)
         .animation(.easeOut(duration: 0.18), value: expanded)
     }
 

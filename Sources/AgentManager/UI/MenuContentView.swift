@@ -59,7 +59,7 @@ struct MenuContentView: View {
                 }
             }
             .padding(.horizontal, 11)
-            .padding(.bottom, 11)
+            .padding(.bottom, 9)
             .glassGroup()
         }
         .frame(width: 332)
@@ -141,8 +141,8 @@ struct MenuContentView: View {
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 9)
+        .padding(.bottom, 6)
     }
 
     private var tabs: some View {
@@ -168,7 +168,7 @@ struct MenuContentView: View {
             Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 9)
+        .padding(.bottom, 7)
     }
 
     private var emptyMessage: String {
