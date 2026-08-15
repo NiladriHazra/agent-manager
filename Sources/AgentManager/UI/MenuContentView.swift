@@ -156,63 +156,6 @@ struct AgentGroup {
     let usage: Usage?
 }
 
-/// One tool: its account-level numbers once at the top, then a tile per
-/// terminal running it.
-struct AgentGroupView: View {
-    let group: AgentGroup
-    @Binding var inspecting: Int32?
-    @ObservedObject private var prefs = Preferences.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 7) {
-                Text(group.agent.displayName)
-                    .font(BrandFont.body(11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.75))
-                Text(verbatim: "\(group.sessions.count)")
-                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                Spacer()
-                if let usage = group.usage, group.quota == nil {
-                    Text("\(formatTokens(usage.total(includingCacheReads: prefs.includeCacheReads))) this week")
-                        .font(BrandFont.body(9.5))
-                        .foregroundStyle(.white.opacity(0.42))
-                }
-            }
-            .padding(.horizontal, 4)
-
-            if let quota = group.quota {
-                QuotaBar(
-                    quota: quota,
-                    observed: group.quotaObserved,
-                    warn: prefs.warnThreshold,
-                    critical: prefs.criticalThreshold
-                )
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .glassTile(radius: 14)
-            }
-
-            ForEach(group.sessions) { session in
-                SessionRowView(
-                    agent: group.agent,
-                    session: session,
-                    isInspecting: inspecting == session.pid,
-                    onInspect: { inspecting = inspecting == session.pid ? nil : session.pid }
-                )
-            }
-        }
-    }
-
-    private func formatTokens(_ value: Int) -> String {
-        switch value {
-        case 1_000_000...: return String(format: "%.1fM", Double(value) / 1_000_000)
-        case 1_000...: return String(format: "%.0fK", Double(value) / 1_000)
-        default: return "\(value)"
-        }
-    }
-}
-
 /// What sits in the menu bar. Right-clicking it opens Settings and Quit, the
 /// way a menu bar app is expected to behave, so the panel needs no footer.
 struct MenuBarLabel: View {

@@ -5,9 +5,13 @@ import SwiftUI
 struct SessionRowView: View {
     let agent: AgentID
     let session: RunningSession
+    let quota: Quota?
+    let quotaObserved: Date?
+    let usage: Usage?
     let isInspecting: Bool
     let onInspect: () -> Void
 
+    @ObservedObject private var prefs = Preferences.shared
     @State private var hovered = false
 
     private var working: Bool { session.activity.isWorking }
@@ -37,6 +41,19 @@ struct SessionRowView: View {
             }
 
             metadata
+
+            if let quota {
+                QuotaBar(
+                    quota: quota,
+                    observed: quotaObserved,
+                    warn: prefs.warnThreshold,
+                    critical: prefs.criticalThreshold
+                )
+                .padding(.top, 11)
+            } else if let usage {
+                UsageLine(usage: usage, includeCacheReads: prefs.includeCacheReads)
+                    .padding(.top, 9)
+            }
 
             if !session.subAgents.isEmpty { subAgentToggle }
         }
