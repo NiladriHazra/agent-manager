@@ -61,6 +61,11 @@ enum Diagnostics {
                 line += "no numbers"
             }
             print(line)
+            for model in snapshot.models {
+                let week = model.week.total(includingCacheReads: false)
+                let day = model.day.total(includingCacheReads: false)
+                print("              · \(pad(model.label, 22))7d \(pad(short(week), 10))24h \(short(day))")
+            }
             for session in snapshot.sessions {
                 let state: String
                 switch session.activity {
@@ -86,6 +91,14 @@ enum Diagnostics {
             return "\(snapshot.agent.rawValue) \(Int(chat.contextFraction * 100))% context "
                 + "(\(chat.contextTokens)/\(chat.contextWindow), \(chat.model ?? "?"))"
         }.joined(separator: "  |  ")
+    }
+
+    private static func short(_ value: Int) -> String {
+        switch value {
+        case 1_000_000...: return String(format: "%.1fM", Double(value) / 1_000_000)
+        case 1_000...: return String(format: "%.0fK", Double(value) / 1_000)
+        default: return "\(value)"
+        }
     }
 
     private static func describe(_ availability: Availability) -> String {

@@ -99,7 +99,8 @@ struct MenuContentView: View {
                 quota: snapshot.quota,
                 quotaObserved: snapshot.quotaObserved,
                 usage: snapshot.usage,
-                usageToday: snapshot.usageToday
+                usageToday: snapshot.usageToday,
+                models: snapshot.models
             )
         }
     }
@@ -123,6 +124,7 @@ struct MenuContentView: View {
                                     quotaObserved: nil,
                                     usage: nil,
                                     usageToday: nil,
+                                    selectedModel: .constant(nil),
                                     isInspecting: false,
                                     onInspect: { detail = .subAgents(pid: session.pid) }
                                 )
@@ -219,6 +221,7 @@ struct AgentGroup {
     let quotaObserved: Date?
     let usage: Usage?
     let usageToday: Usage?
+    var models: [ModelUsage] = []
 }
 
 /// What sits in the menu bar. Right-clicking it opens Settings and Quit, the

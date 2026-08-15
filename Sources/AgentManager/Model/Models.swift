@@ -159,6 +159,9 @@ struct AgentSnapshot: Identifiable, Equatable {
     /// Same measure over the last 24 hours.
     var usageToday: Usage?
     var credits: String?
+    /// Per-model breakdown, most recently used first, where the agent records
+    /// which model each turn used.
+    var models: [ModelUsage] = []
     var sessions: [RunningSession] = []
 
     var id: String { agent.rawValue }

@@ -9,6 +9,10 @@ struct SessionRowView: View {
     let quotaObserved: Date?
     let usage: Usage?
     let usageToday: Usage?
+    /// Empty in the side panel, where rows are individual terminals and the
+    /// account-level model breakdown does not belong.
+    var models: [ModelUsage] = []
+    @Binding var selectedModel: String?
     let isInspecting: Bool
     let onInspect: () -> Void
 
@@ -45,6 +49,14 @@ struct SessionRowView: View {
             // Token totals are per account, not per terminal. The side panel
             // lists individual sessions, so it passes none — and an empty bar
             // full of dashes is worse than no bar.
+            if models.count > 1, prefs.isEnabled(.model, for: agent) {
+                HStack(spacing: 6) {
+                    ModelSelector(models: models, selection: $selectedModel)
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 9)
+            }
+
             if showsWindows, quota != nil || usage != nil || usageToday != nil {
                 UsagePanel(
                     agent: agent,

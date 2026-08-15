@@ -12,6 +12,9 @@ struct AgentGroupView: View {
     @Binding var detail: DetailTarget?
     let glass: Namespace.ID
     @ObservedObject private var prefs = Preferences.shared
+    /// Defaults to the most recently used model, which is what the agent is on
+    /// right now; nil means every model totalled.
+    @State private var model: String?
 
     private var expanded: Bool { detail == .sessions(group.agent) }
 
@@ -26,6 +29,14 @@ struct AgentGroupView: View {
     private var totalSubAgents: Int { group.sessions.reduce(0) { $0 + $1.subAgents.count } }
 
     var body: some View {
+        content.onAppear {
+            // The model in use right now, unless a choice was already made.
+            if model == nil, group.models.count > 1 { model = group.models.first?.model }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if isSingle, let only = group.sessions.first {
             // A lone session has nothing to stack, so it is shown directly.
             SessionRowView(
@@ -33,8 +44,10 @@ struct AgentGroupView: View {
                 session: only,
                 quota: group.quota,
                 quotaObserved: group.quotaObserved,
-                usage: group.usage,
-                usageToday: group.usageToday,
+                usage: selected?.week ?? group.usage,
+                usageToday: selected?.day ?? group.usageToday,
+                models: group.models,
+                selectedModel: $model,
                 isInspecting: detail == .subAgents(pid: only.pid),
                 onInspect: { detail = detail == .subAgents(pid: only.pid) ? nil : .subAgents(pid: only.pid) }
             )
@@ -77,13 +90,21 @@ struct AgentGroupView: View {
             }
             .buttonStyle(.plain)
 
+            if group.models.count > 1, prefs.isEnabled(.model, for: group.agent) {
+                HStack(spacing: 6) {
+                    ModelSelector(models: group.models, selection: $model)
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 9)
+            }
+
             if prefs.isEnabled(.windows, for: group.agent) {
                 UsagePanel(
                     agent: group.agent,
                     quota: group.quota,
                     quotaObserved: group.quotaObserved,
-                    usage: group.usage,
-                    usageToday: group.usageToday,
+                    usage: selected?.week ?? group.usage,
+                    usageToday: selected?.day ?? group.usageToday,
                     includeCacheReads: prefs.includeCacheReads,
                     warn: prefs.warnThreshold,
                     critical: prefs.criticalThreshold
@@ -96,6 +117,12 @@ struct AgentGroupView: View {
         .padding(.vertical, 10)
         .glassTile(radius: 16, highlighted: expanded, interactive: true)
         .animation(.easeOut(duration: 0.18), value: expanded)
+    }
+
+    /// The chosen model's totals, or nil when showing every model.
+    private var selected: ModelUsage? {
+        guard let model else { return nil }
+        return group.models.first { $0.model == model }
     }
 
     /// What the stack is doing, without having to open it.

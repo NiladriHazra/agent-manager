@@ -21,13 +21,18 @@ actor UsageIndex {
     }
 
     private struct Store: Codable {
-        var version = 5
+        var version = 6
         var files: [String: FileState] = [:]
         var buckets: [String: [String: Bucket]] = [:]
         var titles: [String: SessionMeta] = [:]
         var chats: [String: ChatStats] = [:]
         /// Largest context ever seen per model, which resolves its tier.
         var modelPeaks: [String: Int] = [:]
+        /// Hourly buckets keyed "agent|model", so a row can break its usage
+        /// down by model without a second pass over the transcripts.
+        var modelBuckets: [String: [String: Bucket]] = [:]
+        /// When each model was last used, for defaulting the selector.
+        var modelLastUsed: [String: Double] = [:]
     }
 
     struct SessionMeta: Codable {
@@ -157,6 +162,41 @@ actor UsageIndex {
         return best
     }
 
+    /// Every model this agent used inside the window, most recently used
+    /// first, with both windows already totalled.
+    func modelUsage(agent: AgentID, windowDays: Int = 7) -> [ModelUsage] {
+        load()
+        let weekStart = Int(Date().addingTimeInterval(-Double(windowDays) * 86_400).timeIntervalSince1970) / 3600
+        let dayStart = Int(Date().addingTimeInterval(-86_400).timeIntervalSince1970) / 3600
+        let prefix = "\(agent.rawValue)|"
+
+        return store.modelBuckets.compactMap { key, hours -> ModelUsage? in
+            guard key.hasPrefix(prefix) else { return nil }
+            var week = Usage()
+            var day = Usage()
+            for (hour, bucket) in hours {
+                guard let hour = Int(hour), hour >= weekStart else { continue }
+                week.input += bucket.input
+                week.output += bucket.output
+                week.cacheCreate += bucket.cacheCreate
+                week.cacheRead += bucket.cacheRead
+                guard hour >= dayStart else { continue }
+                day.input += bucket.input
+                day.output += bucket.output
+                day.cacheCreate += bucket.cacheCreate
+                day.cacheRead += bucket.cacheRead
+            }
+            guard week.total(includingCacheReads: true) > 0 else { return nil }
+            return ModelUsage(
+                model: String(key.dropFirst(prefix.count)),
+                day: day,
+                week: week,
+                lastUsed: Date(timeIntervalSince1970: store.modelLastUsed[key] ?? 0)
+            )
+        }
+        .sorted { $0.lastUsed > $1.lastUsed }
+    }
+
     func chat(id: String) -> ChatStats? {
         load()
         guard var chat = store.chats[id] else { return nil }
@@ -253,6 +293,17 @@ actor UsageIndex {
             bucket.cacheCreate += usage.cache_creation_input_tokens ?? 0
             bucket.cacheRead += usage.cache_read_input_tokens ?? 0
             store.buckets[agent.rawValue, default: [:]][hour] = bucket
+
+            if let model = record.message?.model, !model.hasPrefix("<") {
+                let key = "\(agent.rawValue)|\(model)"
+                var byModel = store.modelBuckets[key]?[hour] ?? Bucket()
+                byModel.input += usage.input_tokens ?? 0
+                byModel.output += usage.output_tokens ?? 0
+                byModel.cacheCreate += usage.cache_creation_input_tokens ?? 0
+                byModel.cacheRead += usage.cache_read_input_tokens ?? 0
+                store.modelBuckets[key, default: [:]][hour] = byModel
+                store.modelLastUsed[key] = max(store.modelLastUsed[key] ?? 0, stamp.timeIntervalSince1970)
+            }
         }
 
         if let session = record.sessionId, let usage = record.message?.usage, hasUsage {

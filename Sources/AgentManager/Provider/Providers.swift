@@ -166,6 +166,7 @@ struct ClaudeProvider: AgentProvider {
         let windows = await index.windows(agent: agent, roots: [root])
         snapshot.usage = windows.week
         snapshot.usageToday = windows.day
+        snapshot.models = await index.modelUsage(agent: agent)
         snapshot.sessions = await enrich(sessions)
         snapshot.availability = .ready
         return snapshot
