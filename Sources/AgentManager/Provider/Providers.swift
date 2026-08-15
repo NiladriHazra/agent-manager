@@ -119,7 +119,9 @@ struct ClaudeProvider: AgentProvider {
             return snapshot
         }
 
-        snapshot.usage = await index.refresh(agent: agent, roots: [root])
+        let windows = await index.windows(agent: agent, roots: [root])
+        snapshot.usage = windows.week
+        snapshot.usageToday = windows.day
         snapshot.sessions = await enrich(sessions)
         snapshot.availability = .ready
         return snapshot
@@ -197,6 +199,24 @@ struct OpenCodeProvider: AgentProvider {
         usage.cacheRead = Int(row[3]) ?? 0
         usage.cost = Double(row[4])
         snapshot.usage = usage
+
+        let sinceDay = Date().addingTimeInterval(-86_400).timeIntervalSince1970 * 1000
+        if let dayRow = SQLiteReader.queryRow(
+            path: dbPath,
+            sql: """
+            SELECT COALESCE(SUM(tokens_input),0), COALESCE(SUM(tokens_output),0), \
+            COALESCE(SUM(tokens_cache_write),0), COALESCE(SUM(tokens_cache_read),0), \
+            COALESCE(SUM(cost),0) FROM session WHERE time_updated > \(Int(sinceDay));
+            """
+        ), dayRow.count >= 5 {
+            var today = Usage()
+            today.input = Int(dayRow[0]) ?? 0
+            today.output = Int(dayRow[1]) ?? 0
+            today.cacheCreate = Int(dayRow[2]) ?? 0
+            today.cacheRead = Int(dayRow[3]) ?? 0
+            today.cost = Double(dayRow[4])
+            snapshot.usageToday = today
+        }
 
         let openCodeWrite = (try? FileManager.default.attributesOfItem(atPath: dbPath)[.modificationDate] as? Date) ?? nil
         snapshot.sessions = sessions.map {
