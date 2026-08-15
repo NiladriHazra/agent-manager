@@ -26,7 +26,7 @@ struct MenuContentView: View {
     var body: some View {
         // Top-aligned: the side panel is shorter than the list, and an HStack
         // centres by default, which read as a huge gap above it.
-        panel.glassGroup(spacing: 14)
+        panel.glassGroup()
     }
 
     /// Everything inside one glass container, so shapes can flow between the

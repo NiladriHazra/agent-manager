@@ -97,10 +97,13 @@ extension View {
         }
     }
 
-    /// Groups adjacent glass so shapes merge and share refraction the way
-    /// Apple's own controls do, rather than reading as separate panes.
+    /// Groups glass so shapes can morph between states.
+    ///
+    /// `spacing` is the distance at which neighbouring shapes FUSE, not a gap.
+    /// Anything larger than the real gap between rows welds them into one
+    /// wavy blob, so it defaults to zero: morphing without merging.
     @ViewBuilder
-    func glassGroup(spacing: CGFloat = 10) -> some View {
+    func glassGroup(spacing: CGFloat = 0) -> some View {
         if #available(macOS 26.0, *), !RenderMode.isOffscreen {
             GlassEffectContainer(spacing: spacing) { self }
         } else {
