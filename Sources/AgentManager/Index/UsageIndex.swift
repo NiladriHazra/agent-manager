@@ -69,6 +69,14 @@ actor UsageIndex {
     }
 
     /// Rescans whatever changed and returns the rolling window total.
+    /// Totals for both windows in one pass, so a row can show today alongside
+    /// the week without scanning twice.
+    func windows(agent: AgentID, roots: [URL]) -> (day: Usage, week: Usage) {
+        let week = refresh(agent: agent, roots: roots)
+        let day = total(agent: agent, since: Date().addingTimeInterval(-86_400))
+        return (day, week)
+    }
+
     func refresh(agent: AgentID, roots: [URL], windowDays: Int = 7) -> Usage {
         load()
         let cutoff = Date().addingTimeInterval(-Double(windowDays) * 86_400)

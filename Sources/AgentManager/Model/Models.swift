@@ -148,6 +148,8 @@ struct AgentSnapshot: Identifiable, Equatable {
     /// agent is active, so a number can be hours old and must say so.
     var quotaObserved: Date?
     var usage: Usage?
+    /// Same measure over the last 24 hours.
+    var usageToday: Usage?
     var credits: String?
     var sessions: [RunningSession] = []
 

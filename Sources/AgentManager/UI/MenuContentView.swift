@@ -71,7 +71,8 @@ struct MenuContentView: View {
                 sessions: sessions,
                 quota: snapshot.quota,
                 quotaObserved: snapshot.quotaObserved,
-                usage: snapshot.usage
+                usage: snapshot.usage,
+                usageToday: snapshot.usageToday
             )
         }
     }
@@ -103,6 +104,7 @@ struct MenuContentView: View {
 
     private var tabs: some View {
         HStack(spacing: 5) {
+            Spacer()
             ForEach(PanelTab.allCases) { option in
                 let count = option == .working ? model.workingCount : model.openCount
                 Button { tab = option; inspecting = nil } label: {
@@ -154,6 +156,7 @@ struct AgentGroup {
     let quota: Quota?
     let quotaObserved: Date?
     let usage: Usage?
+    let usageToday: Usage?
 }
 
 /// What sits in the menu bar. Right-clicking it opens Settings and Quit, the

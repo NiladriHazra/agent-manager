@@ -8,6 +8,7 @@ struct SessionRowView: View {
     let quota: Quota?
     let quotaObserved: Date?
     let usage: Usage?
+    let usageToday: Usage?
     let isInspecting: Bool
     let onInspect: () -> Void
 
@@ -50,9 +51,11 @@ struct SessionRowView: View {
                     critical: prefs.criticalThreshold
                 )
                 .padding(.top, 11)
-            } else if let usage {
-                UsageLine(usage: usage, includeCacheReads: prefs.includeCacheReads)
-                    .padding(.top, 9)
+                WindowLine(today: usageToday, week: usage, includeCacheReads: prefs.includeCacheReads)
+                    .padding(.top, 8)
+            } else {
+                WindowLine(today: usageToday, week: usage, includeCacheReads: prefs.includeCacheReads)
+                    .padding(.top, 10)
             }
 
             if !session.subAgents.isEmpty { subAgentToggle }

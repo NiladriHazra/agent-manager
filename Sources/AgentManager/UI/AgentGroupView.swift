@@ -25,6 +25,7 @@ struct AgentGroupView: View {
                 quota: group.quota,
                 quotaObserved: group.quotaObserved,
                 usage: group.usage,
+                usageToday: group.usageToday,
                 isInspecting: inspecting == only.pid,
                 onInspect: { inspecting = inspecting == only.pid ? nil : only.pid }
             )
@@ -75,9 +76,19 @@ struct AgentGroupView: View {
                     critical: prefs.criticalThreshold
                 )
                 .padding(.top, 11)
-            } else if let usage = group.usage {
-                UsageLine(usage: usage, includeCacheReads: prefs.includeCacheReads)
-                    .padding(.top, 9)
+                WindowLine(
+                    today: group.usageToday,
+                    week: group.usage,
+                    includeCacheReads: prefs.includeCacheReads
+                )
+                .padding(.top, 8)
+            } else {
+                WindowLine(
+                    today: group.usageToday,
+                    week: group.usage,
+                    includeCacheReads: prefs.includeCacheReads
+                )
+                .padding(.top, 10)
             }
 
             if !expanded {
@@ -94,6 +105,7 @@ struct AgentGroupView: View {
                             quota: nil,
                             quotaObserved: nil,
                             usage: nil,
+                            usageToday: nil,
                             isInspecting: inspecting == session.pid,
                             onInspect: { inspecting = inspecting == session.pid ? nil : session.pid }
                         )
@@ -142,25 +154,49 @@ struct StackedIcons: View {
     }
 }
 
-/// Locally counted tokens, labelled so it is never mistaken for a limit.
-struct UsageLine: View {
-    let usage: Usage
+/// Both windows on one line, today on the left and the week on the right.
+///
+/// These tools publish no limit, so what is shown is what was consumed inside
+/// each rolling window, counted locally, and it says so.
+struct WindowLine: View {
+    let today: Usage?
+    let week: Usage?
     let includeCacheReads: Bool
 
     var body: some View {
-        HStack(spacing: 5) {
-            Text(formatted).foregroundStyle(.white.opacity(0.75))
-            Text("this week").foregroundStyle(.white.opacity(0.4))
-            Text("· usage, no limit published").foregroundStyle(.white.opacity(0.28))
-            Spacer()
-            if let cost = usage.cost {
-                Text(String(format: "$%.2f", cost)).foregroundStyle(.white.opacity(0.5))
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            side(label: "today", usage: today, resets: midnightCountdown)
+            Spacer(minLength: 10)
+            side(label: "7 days", usage: week, resets: "rolling", trailing: true)
         }
         .font(BrandFont.body(10))
     }
 
-    private var formatted: String {
+    private func side(label: String, usage: Usage?, resets: String, trailing: Bool = false) -> some View {
+        VStack(alignment: trailing ? .trailing : .leading, spacing: 1) {
+            HStack(spacing: 4) {
+                Text(label).foregroundStyle(.white.opacity(0.38))
+                Text(format(usage)).foregroundStyle(.white.opacity(0.82))
+            }
+            Text(resets)
+                .font(BrandFont.body(9))
+                .foregroundStyle(.white.opacity(0.28))
+        }
+    }
+
+    /// Today's window turns over at local midnight.
+    private var midnightCountdown: String {
+        let calendar = Calendar.current
+        guard let next = calendar.nextDate(
+            after: Date(),
+            matching: DateComponents(hour: 0, minute: 0),
+            matchingPolicy: .nextTime
+        ) else { return "resets at midnight" }
+        return "resets \(QuotaBar.countdown(to: next))"
+    }
+
+    private func format(_ usage: Usage?) -> String {
+        guard let usage else { return "–" }
         let value = usage.total(includingCacheReads: includeCacheReads)
         switch value {
         case 1_000_000...: return String(format: "%.1fM tokens", Double(value) / 1_000_000)
