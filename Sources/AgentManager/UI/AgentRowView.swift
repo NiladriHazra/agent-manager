@@ -21,10 +21,17 @@ struct AgentLogo: View {
         }
     }
 
+    /// Cached: `body` runs for every row on every refresh, and an uncached
+    /// version re-read and re-rasterized the SVG from disk each time.
+    @MainActor private static var cache: [String: NSImage] = [:]
+
+    @MainActor
     private static func load(_ name: String) -> NSImage? {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg") else { return nil }
-        let image = NSImage(contentsOf: url)
-        image?.size = NSSize(width: 38, height: 38)
+        if let cached = cache[name] { return cached }
+        guard let url = Bundle.module.url(forResource: name, withExtension: "svg"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 38, height: 38)
+        cache[name] = image
         return image
     }
 }

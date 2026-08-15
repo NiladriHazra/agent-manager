@@ -56,17 +56,10 @@ struct SettingsView: View {
         Form {
             Section("Show in the list") {
                 ForEach(AgentID.allCases) { agent in
-                    Toggle(agent.displayName, isOn: Binding(
-                        get: { !prefs.isHidden(agent) },
-                        set: { prefs.setHidden(agent, !$0) }
-                    ))
+                    Toggle(agent.displayName, isOn: prefs.visibilityBinding(for: agent))
                 }
             }
             Section {
-                Toggle("Show idle agents", isOn: $prefs.showIdleAgents)
-                Text("Off by default, so the panel lists only what is working right now.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 Toggle("Hide agents that are not installed", isOn: $prefs.hideNotInstalled)
             }
         }

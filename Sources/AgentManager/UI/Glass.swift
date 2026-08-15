@@ -10,7 +10,7 @@ struct GlassTile: ViewModifier {
     var highlighted = false
     /// Tiles that respond to a click ask for the material's own pointer
     /// reaction rather than a hand-rolled hover fill.
-    var interactive = true
+    var interactive = false
 
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *), !RenderMode.isOffscreen {
@@ -65,7 +65,7 @@ struct GlassTile: ViewModifier {
 }
 
 extension View {
-    func glassTile(radius: CGFloat = 20, highlighted: Bool = false, interactive: Bool = true) -> some View {
+    func glassTile(radius: CGFloat = 20, highlighted: Bool = false, interactive: Bool = false) -> some View {
         modifier(GlassTile(radius: radius, highlighted: highlighted, interactive: interactive))
     }
 
@@ -84,6 +84,17 @@ extension View {
                 Capsule().fill(.ultraThinMaterial)
                     .overlay(Capsule().fill(tint ?? .clear))
             )
+        }
+    }
+
+    /// Liquid Glass renders its own edge, adapted to whatever is behind it, so
+    /// the painted hairline belongs only to the pre-26 fallback.
+    @ViewBuilder
+    func glassRim(_ color: Color) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            self
+        } else {
+            overlay(Capsule().strokeBorder(color, lineWidth: 0.8))
         }
     }
 
@@ -166,7 +177,7 @@ struct StatusPill: View {
         .padding(.horizontal, 9)
         .frame(height: 21)
         .glassCapsule(tint: tone.fill)
-        .overlay(Capsule().strokeBorder(tone.border, lineWidth: 0.8))
+        .glassRim(tone.border)
     }
 }
 

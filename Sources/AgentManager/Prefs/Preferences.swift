@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 enum MenuBarMode: String, CaseIterable, Identifiable {
     case countAndQuota
@@ -38,7 +39,6 @@ final class Preferences: ObservableObject {
     @Published var hideNotInstalled: Bool { didSet { defaults.set(hideNotInstalled, forKey: Key.hideNotInstalled) } }
     /// Off by default: the panel answers "what is working right now", so idle
     /// agents are noise unless you ask for them.
-    @Published var showIdleAgents: Bool { didSet { defaults.set(showIdleAgents, forKey: Key.showIdleAgents) } }
     @Published var hiddenAgents: Set<AgentID> {
         didSet { defaults.set(hiddenAgents.map(\.rawValue).sorted(), forKey: Key.hiddenAgents) }
     }
@@ -50,7 +50,6 @@ final class Preferences: ObservableObject {
         static let criticalThreshold = "criticalThreshold"
         static let includeCacheReads = "includeCacheReads"
         static let hideNotInstalled = "hideNotInstalled"
-        static let showIdleAgents = "showIdleAgents"
         static let hiddenAgents = "hiddenAgents"
     }
 
@@ -63,7 +62,6 @@ final class Preferences: ObservableObject {
         criticalThreshold = defaults.object(forKey: Key.criticalThreshold) as? Int ?? 10
         includeCacheReads = defaults.bool(forKey: Key.includeCacheReads)
         hideNotInstalled = defaults.object(forKey: Key.hideNotInstalled) as? Bool ?? true
-        showIdleAgents = defaults.bool(forKey: Key.showIdleAgents)
         hiddenAgents = Set(
             (defaults.stringArray(forKey: Key.hiddenAgents) ?? []).compactMap(AgentID.init(rawValue:))
         )
@@ -73,5 +71,11 @@ final class Preferences: ObservableObject {
 
     func setHidden(_ agent: AgentID, _ hidden: Bool) {
         if hidden { hiddenAgents.insert(agent) } else { hiddenAgents.remove(agent) }
+    }
+
+    /// Lives here rather than in a view body so it is testable and so
+    /// PreferencesCheck can exercise the same path the UI uses.
+    func visibilityBinding(for agent: AgentID) -> Binding<Bool> {
+        Binding(get: { !self.isHidden(agent) }, set: { self.setHidden(agent, !$0) })
     }
 }

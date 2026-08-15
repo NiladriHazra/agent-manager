@@ -9,15 +9,15 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var snapshots: [AgentSnapshot] = []
-    @Published private(set) var lastUpdated: Date?
-    @Published private(set) var isRefreshing = false
+    // Neither is observed by a view. Publishing them invalidated the whole
+    // panel three times per refresh, defeating the snapshot diffing below.
+    private(set) var lastUpdated: Date?
+    private var isRefreshing = false
 
     private let index = UsageIndex()
     private var providers: [AgentProvider] = []
     private var timer: Timer?
     private var menuIsOpen = false
-
-    private let home = FileManager.default.homeDirectoryForCurrentUser
 
     init() {
         providers = allProviders(index: index)
@@ -76,7 +76,7 @@ final class AppModel: ObservableObject {
 
     func menuClosed() {
         menuIsOpen = false
-        startTimer()
+        startTimer(refreshNow: false)
     }
 
     func refresh() {
@@ -100,7 +100,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func startTimer() {
+    private func startTimer(refreshNow: Bool = true) {
         timer?.invalidate()
         // An open panel is being read right now, so it refreshes far more
         // often; a closed one only needs to keep the menu bar roughly current.
@@ -108,7 +108,7 @@ final class AppModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
-        refresh()
+        if refreshNow { refresh() }
     }
 
     func restartTimer() { startTimer() }

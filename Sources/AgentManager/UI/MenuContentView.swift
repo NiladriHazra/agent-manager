@@ -33,7 +33,7 @@ struct MenuContentView: View {
             }
         }
         .animation(.smooth(duration: 0.28), value: detail)
-        .background(RenderMode.isOffscreen ? AnyView(Theme.surface) : AnyView(Color.clear))
+        .background(RenderMode.isOffscreen ? Theme.surface : Color.clear)
         .onAppear {
             model.menuOpened()
             // Offscreen renders open the side panel so it can be inspected.
@@ -54,7 +54,7 @@ struct MenuContentView: View {
                     emptyState
                 } else {
                     ForEach(groups, id: \.agent) { group in
-                        AgentGroupView(group: group, inspecting: .constant(nil), detail: $detail)
+                        AgentGroupView(group: group, detail: $detail)
                     }
                 }
             }

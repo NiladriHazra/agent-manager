@@ -7,7 +7,6 @@ import SwiftUI
 /// the individual terminals appear only when asked for.
 struct AgentGroupView: View {
     let group: AgentGroup
-    @Binding var inspecting: Int32?
     /// Owned by the panel: these rows are rebuilt on every refresh, so any
     /// state they held would be thrown away mid-interaction.
     @Binding var detail: DetailTarget?
@@ -101,7 +100,7 @@ struct AgentGroupView: View {
 
         }
         .padding(14)
-        .glassTile(radius: 18, highlighted: hovered || expanded)
+        .glassTile(radius: 18, highlighted: hovered || expanded, interactive: true)
         .onHover { hovered = $0 }
         .animation(.easeOut(duration: 0.18), value: expanded)
     }
@@ -109,7 +108,7 @@ struct AgentGroupView: View {
     /// What the stack is doing, without having to open it.
     private var summary: String {
         let places = Set(group.sessions.compactMap { $0.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } })
-        let where_ = places.count == 1 ? places.first! : "\(places.count) repos"
+        let where_ = places.count == 1 ? (places.first ?? "") : "\(places.count) repos"
         if totalSubAgents > 0 {
             return "\(where_) · \(totalSubAgents) sub-agents"
         }
@@ -159,7 +158,7 @@ struct WindowLine: View {
         .font(BrandFont.body(10))
     }
 
-    private func side(label: String, usage: Usage?, resets: String, trailing: Bool = false) -> some View {
+    private func side(label: String, usage: Usage?, resets: Text, trailing: Bool = false) -> some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 1) {
             HStack(spacing: 4) {
                 Text(label).foregroundStyle(.white.opacity(0.38))
@@ -170,7 +169,7 @@ struct WindowLine: View {
                     .foregroundStyle(.white)
                     .monospacedDigit()
             }
-            Text(resets)
+            resets
                 .font(BrandFont.body(9))
                 .foregroundStyle(.white.opacity(0.28))
         }
@@ -178,22 +177,21 @@ struct WindowLine: View {
 
     /// A rolling window has no reset instant, so it states the span it covers
     /// instead of pretending to count down to one.
-    private var rollingWindow: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        let start = formatter.string(from: Date().addingTimeInterval(-7 * 86_400))
-        return "since \(start), rolling"
+    private var rollingWindow: Text {
+        // Text formats this itself; a DateFormatter built in body is one of the
+        // most expensive objects Foundation has, and body runs every refresh.
+        Text("since \(Date.now.addingTimeInterval(-7 * 86_400), format: .dateTime.day().month(.abbreviated)), rolling")
     }
 
     /// Today's window turns over at local midnight.
-    private var midnightCountdown: String {
+    private var midnightCountdown: Text {
         let calendar = Calendar.current
         guard let next = calendar.nextDate(
             after: Date(),
             matching: DateComponents(hour: 0, minute: 0),
             matchingPolicy: .nextTime
-        ) else { return "resets at midnight" }
-        return "resets \(QuotaBar.countdown(to: next))"
+        ) else { return Text("resets at midnight") }
+        return Text("resets \(QuotaBar.countdown(to: next))")
     }
 
     private func format(_ usage: Usage?) -> String {
