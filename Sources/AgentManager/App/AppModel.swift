@@ -78,10 +78,12 @@ final class AppModel: ObservableObject {
     func menuOpened() {
         menuIsOpen = true
         refresh()
+        startTimer()
     }
 
     func menuClosed() {
         menuIsOpen = false
+        startTimer()
     }
 
     func refresh() {
@@ -107,7 +109,9 @@ final class AppModel: ObservableObject {
 
     private func startTimer() {
         timer?.invalidate()
-        let interval = TimeInterval(max(15, Preferences.shared.refreshSeconds))
+        // An open panel is being read right now, so it refreshes far more
+        // often; a closed one only needs to keep the menu bar roughly current.
+        let interval = menuIsOpen ? 3 : TimeInterval(max(10, Preferences.shared.refreshSeconds))
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }

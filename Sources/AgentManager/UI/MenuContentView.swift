@@ -10,61 +10,80 @@ enum PanelTab: String, CaseIterable, Identifiable {
 
 struct MenuContentView: View {
     @ObservedObject var model: AppModel
-    @Environment(\.openSettings) private var openSettings
     @State private var tab: PanelTab = .working
+    @State private var inspecting: Int32?
+    @State private var primed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            tabs
-
-            VStack(spacing: 5) {
-                if rows.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(rows, id: \.session.id) { entry in
-                        SessionRowView(
-                            agent: entry.agent,
-                            session: entry.session,
-                            quota: entry.quota,
-                            quotaObserved: entry.observed
-                        )
-                    }
-                }
+        HStack(spacing: 0) {
+            main
+            if let inspected = inspectedSession {
+                Divider().overlay(Color.white.opacity(0.10))
+                SubAgentPanel(session: inspected.session) { inspecting = nil }
+                    .frame(width: 268)
             }
-            .padding(.horizontal, 9)
-            .padding(.bottom, 9)
         }
-        .frame(width: 300)
         .background {
             if RenderMode.isOffscreen {
                 Theme.surface
             } else {
-                // No dark overlay: it is what was flattening the material into a
-                // plain dark panel instead of the translucent Control Center look.
-                VisualEffectBackground(material: .hudWindow)
+                VisualEffectBackground(material: .popover)
             }
         }
-        .onAppear { model.menuOpened() }
+        .onAppear {
+            model.menuOpened()
+            // Offscreen renders open the side panel so it can be inspected.
+            guard RenderMode.isOffscreen, !primed else { return }
+            primed = true
+            inspecting = groups.flatMap(\.sessions).first { !$0.subAgents.isEmpty }?.pid
+        }
         .onDisappear { model.menuClosed() }
     }
 
-    private struct Row {
-        let agent: AgentID
-        let session: RunningSession
-        let quota: Quota?
-        let observed: Date?
+    private var main: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            tabs
+
+            VStack(spacing: 9) {
+                if groups.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(groups, id: \.agent) { group in
+                        AgentGroupView(group: group, inspecting: $inspecting)
+                    }
+                }
+            }
+            .padding(.horizontal, 11)
+            .padding(.bottom, 11)
+        }
+        .frame(width: 332)
     }
 
-    /// One row per terminal rather than per tool, so four Codex sessions in
-    /// four terminals read as four rows.
-    private var rows: [Row] {
-        model.visibleSnapshots.flatMap { snapshot -> [Row] in
+    /// Sessions gathered under their tool, so an account-level number like the
+    /// Codex quota is stated once rather than repeated on all four terminals.
+    private var groups: [AgentGroup] {
+        model.visibleSnapshots.compactMap { snapshot in
             let sessions = tab == .working ? snapshot.workingSessions : snapshot.openSessions
-            return sessions.map {
-                Row(agent: snapshot.agent, session: $0, quota: snapshot.quota, observed: snapshot.quotaObserved)
+            guard !sessions.isEmpty else { return nil }
+            return AgentGroup(
+                agent: snapshot.agent,
+                sessions: sessions,
+                quota: snapshot.quota,
+                quotaObserved: snapshot.quotaObserved,
+                usage: snapshot.usage
+            )
+        }
+    }
+
+    private var inspectedSession: (agent: AgentID, session: RunningSession)? {
+        guard let inspecting else { return nil }
+        for group in groups {
+            if let match = group.sessions.first(where: { $0.pid == inspecting }) {
+                return (group.agent, match)
             }
         }
+        return nil
     }
 
     private var header: some View {
@@ -73,58 +92,124 @@ struct MenuContentView: View {
                 .font(BrandFont.body(15, weight: .bold))
                 .foregroundStyle(.white)
             Spacer()
-            if let headline = model.headlineQuota {
-                Text("\(headline.agent.displayName) \(Int(headline.quota.remainingPercent))%")
-                    .font(BrandFont.body(10))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
+            Text("updated \(QuotaBar.ago(model.lastUpdated ?? Date()))")
+                .font(BrandFont.body(9.5))
+                .foregroundStyle(.white.opacity(0.32))
         }
-        .padding(.horizontal, 13)
-        .padding(.top, 10)
-        .padding(.bottom, 7)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     private var tabs: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             ForEach(PanelTab.allCases) { option in
                 let count = option == .working ? model.workingCount : model.openCount
-                Button { tab = option } label: {
+                Button { tab = option; inspecting = nil } label: {
                     HStack(spacing: 6) {
-                        Text(option.label)
-                            .font(BrandFont.body(11, weight: .semibold))
-                        Text("\(count)")
+                        Text(option.label).font(BrandFont.body(11, weight: .semibold))
+                        Text(verbatim: "\(count)")
                             .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(tab == option ? .white.opacity(0.8) : .white.opacity(0.4))
+                            .foregroundStyle(.white.opacity(tab == option ? 0.75 : 0.4))
                     }
                     .foregroundStyle(tab == option ? .white : .white.opacity(0.5))
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule().fill(Color.white.opacity(tab == option ? 0.16 : 0))
-                    )
+                    .padding(.horizontal, 11)
+                    .frame(height: 24)
+                    .background {
+                        if tab == option {
+                            Capsule().fill(.ultraThinMaterial)
+                                .overlay(Capsule().fill(Color.white.opacity(0.13)))
+                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7))
+                        }
+                    }
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
             Spacer()
         }
-        .padding(.horizontal, 11)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 9)
     }
 
     private var emptyState: some View {
         VStack(spacing: 6) {
             Text(tab == .working ? "Nothing working right now" : "No idle sessions")
-                .font(BrandFont.body(13, weight: .semibold))
+                .font(BrandFont.body(12.5, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.6))
             if tab == .working, model.openCount > 0 {
-                Text("\(model.openCount) session\(model.openCount == 1 ? "" : "s") open at a prompt")
+                Text("\(model.openCount) open at a prompt")
                     .font(BrandFont.body(11))
                     .foregroundStyle(.white.opacity(0.35))
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
+        .padding(.vertical, 20)
+    }
+}
+
+struct AgentGroup {
+    let agent: AgentID
+    let sessions: [RunningSession]
+    let quota: Quota?
+    let quotaObserved: Date?
+    let usage: Usage?
+}
+
+/// One tool: its account-level numbers once at the top, then a tile per
+/// terminal running it.
+struct AgentGroupView: View {
+    let group: AgentGroup
+    @Binding var inspecting: Int32?
+    @ObservedObject private var prefs = Preferences.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Text(group.agent.displayName)
+                    .font(BrandFont.body(11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                Text(verbatim: "\(group.sessions.count)")
+                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                Spacer()
+                if let usage = group.usage, group.quota == nil {
+                    Text("\(formatTokens(usage.total(includingCacheReads: prefs.includeCacheReads))) this week")
+                        .font(BrandFont.body(9.5))
+                        .foregroundStyle(.white.opacity(0.42))
+                }
+            }
+            .padding(.horizontal, 4)
+
+            if let quota = group.quota {
+                QuotaBar(
+                    quota: quota,
+                    observed: group.quotaObserved,
+                    warn: prefs.warnThreshold,
+                    critical: prefs.criticalThreshold
+                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .glassTile(radius: 14)
+            }
+
+            ForEach(group.sessions) { session in
+                SessionRowView(
+                    agent: group.agent,
+                    session: session,
+                    isInspecting: inspecting == session.pid,
+                    onInspect: { inspecting = inspecting == session.pid ? nil : session.pid }
+                )
+            }
+        }
+    }
+
+    private func formatTokens(_ value: Int) -> String {
+        switch value {
+        case 1_000_000...: return String(format: "%.1fM", Double(value) / 1_000_000)
+        case 1_000...: return String(format: "%.0fK", Double(value) / 1_000)
+        default: return "\(value)"
+        }
     }
 }
 
@@ -149,7 +234,7 @@ struct MenuBarLabel: View {
     }
 
     private var text: String {
-        let quota = model.headlineQuota.map { "\(Int($0.quota.remainingPercent))%" }
+        let quota = model.headlineQuota.map { "\(Int($0.quota.usedPercent))%" }
         switch prefs.menuBarMode {
         case .countAndQuota:
             guard let quota else { return "\(model.workingCount)" }
