@@ -1,140 +1,150 @@
 import SwiftUI
 
+enum PanelTab: String, CaseIterable, Identifiable {
+    case working
+    case open
+
+    var id: String { rawValue }
+    var label: String { self == .working ? "Working" : "Open" }
+}
+
 struct MenuContentView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openSettings) private var openSettings
+    @State private var tab: PanelTab = .working
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            tabs
 
-            // A plain stack, not a ScrollView: inside MenuBarExtra's window a
-            // ScrollView collapses to zero height, which left the panel showing
-            // its header and footer with nothing in between.
-            VStack(spacing: 8) {
-                if model.visibleSnapshots.isEmpty {
+            VStack(spacing: 5) {
+                if rows.isEmpty {
                     emptyState
                 } else {
-                    ForEach(model.visibleSnapshots) { snapshot in
-                        AgentRowView(snapshot: snapshot)
+                    ForEach(rows, id: \.session.id) { entry in
+                        SessionRowView(
+                            agent: entry.agent,
+                            session: entry.session,
+                            quota: entry.quota,
+                            quotaObserved: entry.observed
+                        )
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 12)
-
-            footer
+            .padding(.horizontal, 9)
+            .padding(.bottom, 9)
         }
-        .frame(width: 336)
+        .frame(width: 300)
         .background {
             if RenderMode.isOffscreen {
                 Theme.surface
             } else {
-                VisualEffectBackground().overlay(Color.black.opacity(0.18))
+                // No dark overlay: it is what was flattening the material into a
+                // plain dark panel instead of the translucent Control Center look.
+                VisualEffectBackground(material: .hudWindow)
             }
         }
         .onAppear { model.menuOpened() }
         .onDisappear { model.menuClosed() }
     }
 
+    private struct Row {
+        let agent: AgentID
+        let session: RunningSession
+        let quota: Quota?
+        let observed: Date?
+    }
+
+    /// One row per terminal rather than per tool, so four Codex sessions in
+    /// four terminals read as four rows.
+    private var rows: [Row] {
+        model.visibleSnapshots.flatMap { snapshot -> [Row] in
+            let sessions = tab == .working ? snapshot.workingSessions : snapshot.openSessions
+            return sessions.map {
+                Row(agent: snapshot.agent, session: $0, quota: snapshot.quota, observed: snapshot.quotaObserved)
+            }
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("Agents")
-                .font(BrandFont.body(20, weight: .bold))
+                .font(BrandFont.body(15, weight: .bold))
                 .foregroundStyle(.white)
-            Text(subtitle)
-                .font(BrandFont.body(11))
-                .foregroundStyle(.white.opacity(0.5))
+            Spacer()
+            if let headline = model.headlineQuota {
+                Text("\(headline.agent.displayName) \(Int(headline.quota.remainingPercent))%")
+                    .font(BrandFont.body(10))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.top, 10)
+        .padding(.bottom, 7)
+    }
+
+    private var tabs: some View {
+        HStack(spacing: 4) {
+            ForEach(PanelTab.allCases) { option in
+                let count = option == .working ? model.workingCount : model.openCount
+                Button { tab = option } label: {
+                    HStack(spacing: 6) {
+                        Text(option.label)
+                            .font(BrandFont.body(11, weight: .semibold))
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(tab == option ? .white.opacity(0.8) : .white.opacity(0.4))
+                    }
+                    .foregroundStyle(tab == option ? .white : .white.opacity(0.5))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(Color.white.opacity(tab == option ? 0.16 : 0))
+                    )
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
             Spacer()
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 11)
+        .padding(.bottom, 8)
     }
 
-    private var subtitle: String {
-        let working = model.workingCount
-        let open = model.openCount
-        if working > 0 {
-            return open > working ? "\(working) working · \(open) open" : "\(working) working"
-        }
-        return open > 0 ? "\(open) open, none working" : "nothing running"
-    }
-
-    /// The list shows what is working, so it is empty most of the time. Say so,
-    /// and keep any real quota visible rather than showing a blank box.
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Text("Nothing working right now")
+            Text(tab == .working ? "Nothing working right now" : "No idle sessions")
                 .font(BrandFont.body(13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.65))
-            if model.openCount > 0 {
+                .foregroundStyle(.white.opacity(0.6))
+            if tab == .working, model.openCount > 0 {
                 Text("\(model.openCount) session\(model.openCount == 1 ? "" : "s") open at a prompt")
                     .font(BrandFont.body(11))
                     .foregroundStyle(.white.opacity(0.35))
             }
-            if let headline = model.headlineQuota {
-                Text("\(headline.agent.displayName): \(Int(headline.quota.remainingPercent))% left this week")
-                    .font(BrandFont.body(11))
-                    .foregroundStyle(.white.opacity(0.35))
-            }
         }
-        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 26)
-    }
-
-    private var footer: some View {
-        VStack(spacing: 0) {
-            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
-            HStack(spacing: 14) {
-                if let updated = model.lastUpdated {
-                    Text("updated \(QuotaBar.ago(updated))")
-                        .font(BrandFont.body(10))
-                        .foregroundStyle(.white.opacity(0.35))
-                }
-                Spacer()
-                FooterButton(title: "Settings") { openSettings() }
-                FooterButton(title: "Quit") { NSApplication.shared.terminate(nil) }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-        }
+        .padding(.vertical, 18)
     }
 }
 
-private struct FooterButton: View {
-    let title: String
-    let action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(BrandFont.body(11, weight: .medium))
-                .foregroundStyle(.white.opacity(hovered ? 0.95 : 0.6))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.white.opacity(hovered ? 0.12 : 0)))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-    }
-}
-
-/// What sits in the menu bar. Digits are monospaced and the layout is
-/// fixed-width so the bar does not reflow every time a number ticks.
+/// What sits in the menu bar. Right-clicking it opens Settings and Quit, the
+/// way a menu bar app is expected to behave, so the panel needs no footer.
 struct MenuBarLabel: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var prefs = Preferences.shared
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        // One Text rather than a stack of conditional views: MenuBarExtra
-        // renders its label into a template image, and conditional subviews
-        // there do not reliably re-render when the model changes.
         HStack(spacing: 4) {
             Image(nsImage: MenuBarGlyph.image(working: model.workingCount > 0))
             if !text.isEmpty { Text(text).monospacedDigit() }
+        }
+        .contextMenu {
+            Button("Settings…") { openSettings() }
+            Button("Refresh now") { model.refresh() }
+            Divider()
+            Button("Quit agent-manager") { NSApplication.shared.terminate(nil) }
         }
     }
 
@@ -144,12 +154,9 @@ struct MenuBarLabel: View {
         case .countAndQuota:
             guard let quota else { return "\(model.workingCount)" }
             return "\(model.workingCount) · \(quota)"
-        case .countOnly:
-            return "\(model.workingCount)"
-        case .quotaOnly:
-            return quota ?? "–"
-        case .iconOnly:
-            return ""
+        case .countOnly: return "\(model.workingCount)"
+        case .quotaOnly: return quota ?? "–"
+        case .iconOnly: return ""
         }
     }
 }

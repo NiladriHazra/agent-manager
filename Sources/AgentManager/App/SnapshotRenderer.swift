@@ -36,9 +36,7 @@ enum SnapshotRenderer {
         // Renders the real panel, so what this writes is what the menu shows.
         // The window material cannot be sampled offscreen, so it is stood in
         // with the surface colour here.
-        let view = MenuContentView(model: model)
-            .frame(width: 320)
-            .background(Theme.surface)
+        let view = MenuContentView(model: model).background(Theme.surface)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
 

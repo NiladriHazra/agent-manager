@@ -119,6 +119,7 @@ struct RunningSession: Equatable, Identifiable {
     var title: String?
     var cwd: String?
     var branch: String?
+    var subAgents: [SubAgent] = []
 
     var id: Int32 { pid }
 
@@ -153,6 +154,7 @@ struct AgentSnapshot: Identifiable, Equatable {
     var id: String { agent.rawValue }
     var isRunning: Bool { !sessions.isEmpty }
     var workingSessions: [RunningSession] { sessions.filter { $0.activity.isWorking } }
+    var openSessions: [RunningSession] { sessions.filter { !$0.activity.isWorking } }
     var isWorking: Bool { !workingSessions.isEmpty }
 }
 

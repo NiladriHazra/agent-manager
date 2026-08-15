@@ -152,6 +152,10 @@ struct ClaudeProvider: AgentProvider {
                 lastWrite: UsageIndex.lastWrite(in: [root], matching: session.sessionID)
                     ?? UsageIndex.lastWrite(in: [root])
             )
+            if let id = session.sessionID {
+                session.subAgents = SessionDetail.subAgents(sessionID: id, root: root)
+                session.branch = SessionDetail.branch(sessionID: id, root: root) ?? session.branch
+            }
             result.append(session)
         }
         return result

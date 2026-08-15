@@ -121,9 +121,9 @@ struct IconChip: View {
             Circle()
                 .fill(lit ? Color.white.opacity(0.92) : Color.white.opacity(0.11))
             AgentLogo(agent: agent, inverted: lit)
-                .frame(width: 19, height: 19)
+                .frame(width: 14, height: 14)
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 26, height: 26)
     }
 }
 
@@ -148,8 +148,8 @@ struct StatusChip: View {
         }
         .font(BrandFont.body(10, weight: .medium))
         .foregroundStyle(tone.text)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2.5)
         .background(Capsule().fill(tone.fill))
         .overlay(Capsule().strokeBorder(tone.stroke, lineWidth: 0.5))
     }
@@ -220,7 +220,7 @@ struct QuotaBar: View {
                         .frame(width: max(6, geo.size.width * quota.remainingPercent / 100))
                 }
             }
-            .frame(height: 8)
+            .frame(height: 5)
 
             HStack(spacing: 4) {
                 Text("\(Int(quota.remainingPercent))% left").foregroundStyle(tone.text)
