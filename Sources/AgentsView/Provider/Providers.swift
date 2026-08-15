@@ -1,0 +1,203 @@
+import Foundation
+
+protocol AgentProvider {
+    var agent: AgentID { get }
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot
+}
+
+private let home = FileManager.default.homeDirectoryForCurrentUser
+
+// MARK: - Codex
+
+/// The only agent that writes its real limit to disk. Each session logs
+/// `token_count` events carrying `rate_limits.primary`, so the newest record in
+/// the newest session is the live quota. Session files reach 295 MB, so this
+/// only ever tail-reads.
+struct CodexProvider: AgentProvider {
+    let agent = AgentID.codex
+    private let root = home.appendingPathComponent(".codex/sessions")
+
+    private struct Envelope: Decodable {
+        struct Payload: Decodable {
+            struct RateLimits: Decodable {
+                struct Primary: Decodable {
+                    let used_percent: Double
+                    let window_minutes: Int
+                    let resets_at: Double
+                }
+                struct Credits: Decodable {
+                    let balance: String?
+                    let unlimited: Bool?
+                }
+                let primary: Primary?
+                let credits: Credits?
+            }
+            let rate_limits: RateLimits?
+        }
+        let payload: Payload?
+    }
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        guard FileManager.default.fileExists(atPath: root.path) else {
+            snapshot.availability = .notInstalled
+            return snapshot
+        }
+
+        guard let newest = newestSessionFile() else {
+            snapshot.availability = .unavailable("no sessions yet")
+            return snapshot
+        }
+
+        let decoder = JSONDecoder()
+        let found = TailReader.newestLine(in: newest, containing: "\"rate_limits\"") { data -> Envelope.Payload.RateLimits? in
+            (try? decoder.decode(Envelope.self, from: data))?.payload?.rate_limits
+        }
+
+        guard let limits = found, let primary = limits.primary else {
+            snapshot.availability = .unavailable("no quota record")
+            return snapshot
+        }
+
+        snapshot.quota = Quota(
+            usedPercent: primary.used_percent,
+            windowMinutes: primary.window_minutes,
+            resetsAt: Date(timeIntervalSince1970: primary.resets_at)
+        )
+        if let credits = limits.credits, credits.unlimited != true, let balance = credits.balance {
+            snapshot.credits = balance
+        }
+        snapshot.availability = .ready
+        return snapshot
+    }
+
+    private func newestSessionFile() -> URL? {
+        UsageIndex.transcripts(in: [root], modifiedAfter: Date(timeIntervalSince1970: 0))
+            .max { lhs, rhs in
+                let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                return l < r
+            }
+    }
+}
+
+// MARK: - Claude Code
+
+/// No limit is ever written to disk, so this reports locally computed usage
+/// only, and the UI labels it as such. Transcripts nest one level deeper than
+/// they appear: subagent runs live in `<session>/subagents/` and carry a large
+/// share of the tokens.
+struct ClaudeProvider: AgentProvider {
+    let agent = AgentID.claude
+    let index: UsageIndex
+    private let root = home.appendingPathComponent(".claude/projects")
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        guard FileManager.default.fileExists(atPath: root.path) else {
+            snapshot.availability = .notInstalled
+            return snapshot
+        }
+
+        snapshot.usage = await index.refresh(agent: agent, roots: [root])
+        snapshot.sessions = await enrich(sessions)
+        snapshot.availability = .ready
+        return snapshot
+    }
+
+    /// Adds the "what is it working on" line: exact when the process carries
+    /// `--resume <uuid>`, otherwise the newest session sharing its cwd.
+    private func enrich(_ sessions: [RunningSession]) async -> [RunningSession] {
+        var result: [RunningSession] = []
+        var claimed = Set<String>()
+
+        for var session in sessions {
+            if let id = session.sessionID, let meta = await index.sessionMeta(id: id) {
+                claimed.insert(id)
+                session.title = meta.title
+                session.cwd = meta.cwd ?? session.cwd
+                session.branch = meta.branch
+            } else if let cwd = session.cwd,
+                      let match = await index.newestSession(cwd: cwd, excluding: claimed) {
+                // Without a resume flag the best available signal is the newest
+                // transcript in the same directory. Claiming it stops several
+                // concurrent sessions all reporting the same title.
+                claimed.insert(match.id)
+                session.title = match.meta.title
+                session.branch = match.meta.branch
+            } else {
+                session.title = nil
+            }
+            result.append(session)
+        }
+        return result
+    }
+}
+
+// MARK: - OpenCode
+
+/// Token totals are already aggregated per session in SQLite, so a single
+/// read-only query covers the whole window. The database belongs to another
+/// process and is never written to.
+struct OpenCodeProvider: AgentProvider {
+    let agent = AgentID.opencode
+    private let dbPath = home.appendingPathComponent(".local/share/opencode/opencode.db").path
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        guard FileManager.default.fileExists(atPath: dbPath) else {
+            snapshot.availability = .notInstalled
+            return snapshot
+        }
+
+        let since = Date().addingTimeInterval(-7 * 86_400).timeIntervalSince1970 * 1000
+        let sql = """
+        SELECT COALESCE(SUM(tokens_input),0), COALESCE(SUM(tokens_output),0), \
+        COALESCE(SUM(tokens_cache_write),0), COALESCE(SUM(tokens_cache_read),0), \
+        COALESCE(SUM(cost),0) FROM session WHERE time_updated > \(Int(since));
+        """
+
+        guard let row = SQLiteReader.queryRow(path: dbPath, sql: sql), row.count >= 5 else {
+            snapshot.availability = .unavailable("database busy")
+            return snapshot
+        }
+
+        var usage = Usage()
+        usage.input = Int(row[0]) ?? 0
+        usage.output = Int(row[1]) ?? 0
+        usage.cacheCreate = Int(row[2]) ?? 0
+        usage.cacheRead = Int(row[3]) ?? 0
+        usage.cost = Double(row[4])
+        snapshot.usage = usage
+
+        if !sessions.isEmpty,
+           let title = SQLiteReader.queryRow(
+               path: dbPath,
+               sql: "SELECT title FROM session ORDER BY time_updated DESC LIMIT 1;"
+           )?.first {
+            snapshot.sessions = sessions.map {
+                var copy = $0
+                copy.title = title
+                return copy
+            }
+        }
+        snapshot.availability = .ready
+        return snapshot
+    }
+}
+
+// MARK: - Presence only
+
+/// Cursor, Gemini, Antigravity and Hermes keep nothing useful on disk. They are
+/// shown as running or idle and nothing is invented for them.
+struct PresenceProvider: AgentProvider {
+    let agent: AgentID
+    let installedPaths: [String]
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        let installed = installedPaths.contains { FileManager.default.fileExists(atPath: $0) }
+        snapshot.availability = installed || !sessions.isEmpty ? .ready : .notInstalled
+        return snapshot
+    }
+}
