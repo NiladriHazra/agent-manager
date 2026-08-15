@@ -10,12 +10,15 @@ struct AgentGroupView: View {
     /// Owned by the panel: these rows are rebuilt on every refresh, so any
     /// state they held would be thrown away mid-interaction.
     @Binding var detail: DetailTarget?
+    let glass: Namespace.ID
     @ObservedObject private var prefs = Preferences.shared
 
     private var expanded: Bool { detail == .sessions(group.agent) }
 
     private func toggleExpanded() {
-        detail = expanded ? nil : .sessions(group.agent)
+        withAnimation(.smooth(duration: 0.34, extraBounce: 0.08)) {
+            detail = expanded ? nil : .sessions(group.agent)
+        }
     }
 
     private var working: Int { group.sessions.filter { $0.activity.isWorking }.count }
@@ -74,17 +77,19 @@ struct AgentGroupView: View {
             }
             .buttonStyle(.plain)
 
-            UsagePanel(
-                agent: group.agent,
-                quota: group.quota,
-                quotaObserved: group.quotaObserved,
-                usage: group.usage,
-                usageToday: group.usageToday,
-                includeCacheReads: prefs.includeCacheReads,
-                warn: prefs.warnThreshold,
-                critical: prefs.criticalThreshold
-            )
-            .padding(.top, 9)
+            if prefs.isEnabled(.windows, for: group.agent) {
+                UsagePanel(
+                    agent: group.agent,
+                    quota: group.quota,
+                    quotaObserved: group.quotaObserved,
+                    usage: group.usage,
+                    usageToday: group.usageToday,
+                    includeCacheReads: prefs.includeCacheReads,
+                    warn: prefs.warnThreshold,
+                    critical: prefs.criticalThreshold
+                )
+                .padding(.top, 9)
+            }
 
         }
         .padding(.horizontal, 12)

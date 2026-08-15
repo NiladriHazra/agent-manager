@@ -303,18 +303,6 @@ struct StatusDot: View {
     }
 }
 
-extension View {
-    /// The selected tab, as a glass capsule rather than a painted one so it
-    /// picks up whatever is behind the panel.
-    @ViewBuilder
-    func glassTab(selected: Bool) -> some View {
-        if selected {
-            glassCapsule(tint: .white.opacity(0.10))
-        } else {
-            self
-        }
-    }
-}
 
 /// prompt-kit's `wave` loader: five bars rippling in a travelling sine.
 ///
@@ -356,5 +344,34 @@ struct WaveLoader: View {
             }
         }
         .frame(width: CGFloat(bars) * barWidth * 1.9, height: height)
+    }
+}
+
+extension View {
+    /// Ties a glass shape to an identity so SwiftUI morphs it — the selected
+    /// tab pill flowing to its new position, the detail panel growing out of
+    /// the tile that opened it — instead of cross-fading two separate shapes.
+    @ViewBuilder
+    func glassMorph(id: String, in namespace: Namespace.ID) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            glassEffectID(id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// The selected tab, as a glass capsule rather than a painted one so it
+    /// picks up whatever is behind the panel.
+    @ViewBuilder
+    func glassTab(selected: Bool, morphID: String? = nil, in namespace: Namespace.ID? = nil) -> some View {
+        if selected {
+            if let namespace, let morphID {
+                glassCapsule(tint: .white.opacity(0.10)).glassMorph(id: morphID, in: namespace)
+            } else {
+                glassCapsule(tint: .white.opacity(0.10))
+            }
+        } else {
+            self
+        }
     }
 }

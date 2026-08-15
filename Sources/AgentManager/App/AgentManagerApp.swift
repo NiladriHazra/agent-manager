@@ -13,6 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = StatusItemController(model: model)
     }
+
+    /// Settings switches the app to a regular one so its window can take focus;
+    /// closing the last window puts it back in the menu bar where it belongs.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { NSApp.setActivationPolicy(.accessory) }
+        return false
+    }
 }
 
 struct AgentManagerApp: App {

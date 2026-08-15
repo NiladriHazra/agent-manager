@@ -15,6 +15,8 @@ struct ChatStats: Codable, Equatable {
     var model: String?
     var turns = 0
     var thinking = 0
+    /// Only agents that publish a price do this: OpenCode and Grok.
+    var cost: Double?
 
     /// The transcript records a model family but not which context tier the
     /// session was opened with, so the tier is inferred from what the context
@@ -33,5 +35,6 @@ struct ChatStats: Codable, Equatable {
         return model
             .replacingOccurrences(of: "claude-", with: "")
             .replacingOccurrences(of: "-20", with: " ")
+            .replacingOccurrences(of: "-preview", with: "")
     }
 }

@@ -20,6 +20,13 @@ struct ChatLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
+            if chat.contextTokens > 0 { contextBar }
+            tokenLine
+        }
+    }
+
+    private var contextBar: some View {
+        VStack(alignment: .leading, spacing: 5) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.13))
@@ -44,7 +51,10 @@ struct ChatLine: View {
                 }
             }
             .font(BrandFont.body(9.5))
+        }
+    }
 
+    private var tokenLine: some View {
             HStack(spacing: 5) {
                 Text("in \(short(chat.input + chat.cacheCreate))")
                     .foregroundStyle(.white.opacity(0.55))
@@ -57,13 +67,14 @@ struct ChatLine: View {
                         .foregroundStyle(.white.opacity(0.4))
                 }
                 Spacer(minLength: 4)
-                if chat.turns > 0 {
+                if let cost = chat.cost, cost > 0 {
+                    Text(String(format: "$%.2f", cost)).foregroundStyle(.white.opacity(0.5))
+                } else if chat.turns > 0 {
                     Text("\(chat.turns) turns").foregroundStyle(.white.opacity(0.3))
                 }
             }
             .font(BrandFont.body(9.5))
             .monospacedDigit()
-        }
     }
 
     private func short(_ value: Int) -> String {

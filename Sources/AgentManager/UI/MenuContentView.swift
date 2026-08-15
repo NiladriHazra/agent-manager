@@ -21,20 +21,34 @@ struct MenuContentView: View {
     @State private var tab: PanelTab = .working
     @State private var detail: DetailTarget?
     @State private var primed = false
+    @Namespace private var glass
 
     var body: some View {
         // Top-aligned: the side panel is shorter than the list, and an HStack
         // centres by default, which read as a huge gap above it.
+        panel.glassGroup(spacing: 14)
+    }
+
+    /// Everything inside one glass container, so shapes can flow between the
+    /// list and the detail column instead of cross-fading.
+    private var panel: some View {
         HStack(alignment: .top, spacing: 0) {
             main
             if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))
                 sidePanel
                     .frame(width: 300, alignment: .top)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .glassMorph(id: "detail", in: glass)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.92, anchor: .leading).combined(with: .opacity),
+                        removal: .scale(scale: 0.94, anchor: .leading).combined(with: .opacity)
+                    ))
             }
         }
-        .animation(.smooth(duration: 0.28), value: detail)
+        // Apple's own spring, so the side panel grows out of the tile the
+        // way system glass surfaces do rather than sliding in flat.
+        .animation(.smooth(duration: 0.34, extraBounce: 0.08), value: detail)
+        .animation(.smooth(duration: 0.24), value: tab)
         .background(RenderMode.isOffscreen ? Theme.surface : Color.clear)
         .onAppear {
             model.menuOpened()
@@ -56,7 +70,8 @@ struct MenuContentView: View {
                     emptyState
                 } else {
                     ForEach(groups, id: \.agent) { group in
-                        AgentGroupView(group: group, detail: $detail)
+                        AgentGroupView(group: group, detail: $detail, glass: glass)
+                            .glassMorph(id: "agent-\(group.agent.rawValue)", in: glass)
                     }
                 }
             }
@@ -152,7 +167,7 @@ struct MenuContentView: View {
             Spacer()
             ForEach(PanelTab.allCases) { option in
                 let count = model.count(for: option)
-                Button { tab = option; detail = nil } label: {
+                Button { withAnimation(.smooth(duration: 0.24)) { tab = option; detail = nil } } label: {
                     HStack(spacing: 6) {
                         Text(option.label).font(BrandFont.body(11, weight: .semibold))
                         Text(verbatim: "\(count)")
@@ -162,7 +177,7 @@ struct MenuContentView: View {
                     .foregroundStyle(tab == option ? .white : .white.opacity(0.5))
                     .padding(.horizontal, 11)
                     .frame(height: 24)
-                    .glassTab(selected: tab == option)
+                    .glassTab(selected: tab == option, morphID: "tab", in: glass)
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)

@@ -35,12 +35,12 @@ struct SessionRowView: View {
                 StatusPill(text: state.text, tone: state.tone, indicator: state.indicator)
             }
 
-            metadata
+            if prefs.isEnabled(.branch, for: agent) { metadata }
 
             // Token totals are per account, not per terminal. The side panel
             // lists individual sessions, so it passes none — and an empty bar
             // full of dashes is worse than no bar.
-            if quota != nil || usage != nil || usageToday != nil {
+            if showsWindows, quota != nil || usage != nil || usageToday != nil {
                 UsagePanel(
                     agent: agent,
                     quota: quota,
@@ -54,12 +54,12 @@ struct SessionRowView: View {
                 .padding(.top, 9)
             }
 
-            if let chat = session.chat, chat.contextTokens > 0 {
+            if let chat = visibleChat {
                 ChatLine(chat: chat, tint: LogoTint.color(for: agent))
                     .padding(.top, 9)
             }
 
-            if !session.subAgents.isEmpty { subAgentToggle }
+            if !session.subAgents.isEmpty, prefs.isEnabled(.subAgents, for: agent) { subAgentToggle }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
@@ -118,6 +118,22 @@ struct SessionRowView: View {
         }
         .buttonStyle(.plain)
         .padding(.top, 8)
+    }
+
+    private var showsWindows: Bool { prefs.isEnabled(.windows, for: agent) }
+
+    /// The chat block honours three separate switches, so a row can show its
+    /// context bar without its token line, or neither.
+    private var visibleChat: ChatStats? {
+        guard var chat = session.chat else { return nil }
+        if !prefs.isEnabled(.context, for: agent) { chat.contextTokens = 0 }
+        if !prefs.isEnabled(.chatTokens, for: agent) {
+            chat.input = 0; chat.output = 0; chat.cacheCreate = 0; chat.thinking = 0
+        }
+        if !prefs.isEnabled(.cost, for: agent) { chat.cost = nil }
+        if !prefs.isEnabled(.model, for: agent) { chat.model = nil }
+        guard chat.contextTokens > 0 || chat.output > 0 || (chat.cost ?? 0) > 0 else { return nil }
+        return chat
     }
 
     private var state: (text: String, tone: StatusPill.Tone, indicator: StatusPill.Indicator) {

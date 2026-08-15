@@ -21,8 +21,9 @@ struct UsagePanel: View {
     private var dayTokens: Int { usageToday?.total(includingCacheReads: includeCacheReads) ?? 0 }
 
     /// Codex publishes a weekly limit, so that half becomes a true quota bar.
-    private var weekIsQuota: Bool { quota?.windowMinutes == 10_080 }
-    private var dayIsQuota: Bool { quota?.windowMinutes == 1_440 }
+    private var showsQuota: Bool { Preferences.shared.isEnabled(.quota, for: agent) }
+    private var weekIsQuota: Bool { showsQuota && quota?.windowMinutes == 10_080 }
+    private var dayIsQuota: Bool { showsQuota && quota?.windowMinutes == 1_440 }
 
     private var weekFraction: Double {
         if weekIsQuota, let quota { return quota.usedPercent / 100 }
@@ -45,7 +46,7 @@ struct UsagePanel: View {
                 tint: LogoTint.color(for: agent)
             )
 
-            if let quota {
+            if let quota, showsQuota {
                 QuotaLine(quota: quota, observed: quotaObserved, warn: warn, critical: critical)
             }
 

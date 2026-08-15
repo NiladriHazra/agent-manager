@@ -13,6 +13,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var observation: NSKeyValueObservation?
+    private var settingsWindow: NSWindow?
 
     init(model: AppModel) {
         self.model = model
@@ -20,11 +21,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         super.init()
 
         popover.behavior = .transient
-        popover.animates = false
+        popover.animates = true
         popover.delegate = self
-        popover.contentViewController = NSHostingController(
-            rootView: MenuContentView(model: model).frame(minWidth: 332)
-        )
+        let host = NSHostingController(rootView: MenuContentView(model: model))
+        // Without this the popover keeps its first measured size, so opening
+        // the side panel widened the content and clipped it instead.
+        host.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = host
 
         if let button = statusItem.button {
             button.target = self
@@ -104,11 +107,31 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 
+    /// The Settings scene is unreliable to open from a status item in an
+    /// accessory app, so the window is owned here instead.
     @objc private func openSettings() {
+        popover.performClose(nil)
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        if #available(macOS 14.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+            return
         }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 460),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "agent-manager Settings"
+        window.titlebarAppearsTransparent = true
+        window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        settingsWindow = window
     }
 
     func popoverDidClose(_ notification: Notification) {

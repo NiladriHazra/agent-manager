@@ -16,15 +16,16 @@ struct DetailPanel: View {
     let onClose: () -> Void
     let rows: AnyView
 
-    private let maxHeight: CGFloat = 420
+    private let maxHeight: CGFloat = 520
     private let fade: CGFloat = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            // An explicit height, not a maximum: a ScrollView given only a
-            // maximum collapses to nothing inside MenuBarExtra's window.
+            // A real maximum now: the panel lives in an NSPopover, where a
+            // ScrollView measures its content properly. The old fixed height
+            // was an estimate per row, and rows that grew got sliced.
             if RenderMode.isOffscreen {
                 rows.padding(.horizontal, 11).padding(.bottom, 11)
             } else {
@@ -35,7 +36,8 @@ struct DetailPanel: View {
                         // rows are never cut mid-tile at rest.
                         .padding(.vertical, fade)
                 }
-                .frame(height: min(CGFloat(count) * 74 + fade * 2, maxHeight))
+                .frame(maxHeight: maxHeight)
+                .fixedSize(horizontal: false, vertical: true)
                 .mask(scrollFade)
                 .scrollIndicators(.never)
             }
