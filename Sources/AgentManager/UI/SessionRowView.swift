@@ -185,32 +185,32 @@ struct IconWell: View {
     var lit: Bool
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(lit ? Color.white.opacity(0.92) : Color.white.opacity(0.06))
-                .glassCapsule()
-            // Brushed-chrome bezel: a bright arc where the light lands, a dark
-            // one opposite, and a faint spectral split where they meet.
-            Circle().strokeBorder(
-                AngularGradient(
-                    colors: [
-                        .white.opacity(lit ? 0.95 : 0.55),
-                        .white.opacity(0.10),
-                        Color(red: 0.62, green: 0.78, blue: 1.0).opacity(0.42),
-                        .white.opacity(0.05),
-                        Color(red: 1.0, green: 0.82, blue: 0.72).opacity(0.35),
-                        .white.opacity(lit ? 0.95 : 0.55),
-                    ],
-                    center: .center,
-                    angle: .degrees(-58)
-                ),
-                lineWidth: 1.1
-            )
-            Circle()
-                .fill(LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .top, endPoint: .center))
-                .padding(1.4)
-            AgentLogo(agent: agent, inverted: lit).frame(width: 16, height: 16)
-        }
-        .frame(width: 30, height: 30)
+        // The mark goes in an overlay, not behind: Liquid Glass composites
+        // above whatever it is applied to, which hid the logo entirely.
+        Circle()
+            .fill(lit ? Color.white.opacity(0.92) : Color.white.opacity(0.06))
+            .overlay {
+                // Brushed-chrome bezel: a bright arc where the light lands, a
+                // dark one opposite, and a faint spectral split between them.
+                Circle().strokeBorder(
+                    AngularGradient(
+                        colors: [
+                            .white.opacity(lit ? 0.9 : 0.5),
+                            .white.opacity(0.08),
+                            Color(red: 0.62, green: 0.78, blue: 1.0).opacity(0.4),
+                            .white.opacity(0.05),
+                            Color(red: 1.0, green: 0.82, blue: 0.72).opacity(0.32),
+                            .white.opacity(lit ? 0.9 : 0.5),
+                        ],
+                        center: .center,
+                        angle: .degrees(-58)
+                    ),
+                    lineWidth: 1.1
+                )
+            }
+            .overlay {
+                AgentLogo(agent: agent, inverted: lit).frame(width: 16, height: 16)
+            }
+            .frame(width: 30, height: 30)
     }
 }
