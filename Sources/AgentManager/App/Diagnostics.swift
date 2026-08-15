@@ -50,10 +50,12 @@ enum Diagnostics {
                 if let observed = snapshot.quotaObserved {
                     line += "  [read \(QuotaBar.ago(observed))]"
                 }
-            } else if let usage = snapshot.usage {
+            }
+            if let usage = snapshot.usage {
+                if snapshot.quota != nil { line += "  " }
                 line += "usage out=\(usage.output) in=\(usage.input) cacheRead=\(usage.cacheRead)"
                 if let cost = usage.cost { line += String(format: " cost=$%.2f", cost) }
-            } else {
+            } else if snapshot.quota == nil {
                 line += "no numbers"
             }
             print(line)

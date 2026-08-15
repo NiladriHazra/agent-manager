@@ -99,11 +99,6 @@ struct AgentGroupView: View {
                 .padding(.top, 10)
             }
 
-            if !expanded {
-                SessionStrip(sessions: group.sessions)
-                    .padding(.top, 10)
-            }
-
         }
         .padding(14)
         .glassTile(radius: 18, highlighted: hovered || expanded)
@@ -130,14 +125,12 @@ struct StackedIcons: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            ForEach(0..<min(count, 3), id: \.self) { index in
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Circle().fill(Color.white.opacity(0.08)))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.6))
-                    .frame(width: 30, height: 30)
-                    .offset(x: CGFloat(min(count, 3) - 1 - index) * 5)
-                    .opacity(index == 0 ? 1 : 0.55)
+            // The discs behind carry the same mark, so a stack reads as several
+            // of the same tool rather than one logo sitting on blank coins.
+            ForEach(1..<max(min(count, 3), 1), id: \.self) { index in
+                IconWell(agent: agent, lit: false)
+                    .offset(x: CGFloat(index) * 5)
+                    .opacity(0.45)
             }
             IconWell(agent: agent, lit: lit)
         }
@@ -158,7 +151,7 @@ struct WindowLine: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             side(label: "today", usage: today, resets: midnightCountdown)
             Spacer(minLength: 10)
-            side(label: "7 days", usage: week, resets: "rolling", trailing: true)
+            side(label: "7 days", usage: week, resets: rollingWindow, trailing: true)
         }
         .font(BrandFont.body(10))
     }
@@ -167,12 +160,26 @@ struct WindowLine: View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 1) {
             HStack(spacing: 4) {
                 Text(label).foregroundStyle(.white.opacity(0.38))
-                Text(format(usage)).foregroundStyle(.white.opacity(0.82))
+                // The number is the reason this line exists, so it is the only
+                // thing here at full weight and full white.
+                Text(format(usage))
+                    .font(BrandFont.body(11.5, weight: .bold))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
             }
             Text(resets)
                 .font(BrandFont.body(9))
                 .foregroundStyle(.white.opacity(0.28))
         }
+    }
+
+    /// A rolling window has no reset instant, so it states the span it covers
+    /// instead of pretending to count down to one.
+    private var rollingWindow: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        let start = formatter.string(from: Date().addingTimeInterval(-7 * 86_400))
+        return "since \(start), rolling"
     }
 
     /// Today's window turns over at local midnight.
@@ -197,38 +204,3 @@ struct WindowLine: View {
     }
 }
 
-/// A one-line preview of what is inside a collapsed stack: a pip per session,
-/// lit when that session is working, plus where they are running.
-struct SessionStrip: View {
-    let sessions: [RunningSession]
-
-    private var places: [String] {
-        Array(Set(sessions.compactMap { $0.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } })).sorted()
-    }
-
-    var body: some View {
-        HStack(spacing: 7) {
-            HStack(spacing: 4) {
-                ForEach(sessions) { session in
-                    Capsule()
-                        .fill(session.activity.isWorking
-                              ? StatusPill.Tone.positive.dot
-                              : Color.white.opacity(0.22))
-                        .frame(width: session.activity.isWorking ? 14 : 8, height: 4)
-                }
-            }
-            ForEach(places.prefix(2), id: \.self) { place in
-                Text(place)
-                    .font(.system(size: 9.5, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.38))
-                    .lineLimit(1)
-            }
-            if places.count > 2 {
-                Text("+\(places.count - 2)")
-                    .font(.system(size: 9.5, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.28))
-            }
-            Spacer(minLength: 0)
-        }
-    }
-}
