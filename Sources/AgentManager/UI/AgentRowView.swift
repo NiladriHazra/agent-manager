@@ -37,8 +37,8 @@ struct AgentLogo: View {
     }
 }
 
-/// A Control Center slider: a tall rounded track with a filled portion.
-struct QuotaBar: View {
+/// The text under the split bar: used, left, window, and when it resets.
+struct QuotaLine: View {
     let quota: Quota
     var observed: Date?
     let warn: Int
@@ -59,38 +59,21 @@ struct QuotaBar: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.13))
-                    Capsule()
-                        .fill(LinearGradient(
-                            colors: tone == .quota
-                                ? [Theme.accentLight, Theme.accent]
-                                : [tone.text, tone.text.opacity(0.75)],
-                            startPoint: .leading, endPoint: .trailing
-                        ))
-                        .frame(width: max(6, geo.size.width * quota.usedPercent / 100))
-                }
+        HStack(spacing: 4) {
+            Text("\(Int(quota.usedPercent))% used").foregroundStyle(.white.opacity(0.85))
+            Text("·").foregroundStyle(.white.opacity(0.3))
+            Text("\(Int(quota.remainingPercent))% left").foregroundStyle(tone.text)
+            Text("·").foregroundStyle(.white.opacity(0.3))
+            Text(quota.windowLabel).foregroundStyle(.white.opacity(0.4))
+            Spacer()
+            if let staleLabel {
+                Text(staleLabel).foregroundStyle(.white.opacity(0.3))
+            } else {
+                Text("resets \(Self.countdown(to: quota.resetsAt))")
+                    .foregroundStyle(.white.opacity(0.4))
             }
-            .frame(height: 5)
-
-            HStack(spacing: 4) {
-                Text("\(Int(quota.usedPercent))% used").foregroundStyle(.white.opacity(0.85))
-                Text("·").foregroundStyle(.white.opacity(0.3))
-                Text("\(Int(quota.remainingPercent))% left").foregroundStyle(tone.text)
-                Text("·").foregroundStyle(.white.opacity(0.3))
-                Text(quota.windowLabel).foregroundStyle(.white.opacity(0.4))
-                Spacer()
-                if let staleLabel {
-                    Text(staleLabel).foregroundStyle(.white.opacity(0.3))
-                } else {
-                    Text("resets \(Self.countdown(to: quota.resetsAt))")
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-            .font(BrandFont.body(10))
         }
+        .font(BrandFont.body(10))
     }
 
     static func countdown(to date: Date) -> String {
@@ -114,3 +97,6 @@ struct QuotaBar: View {
         return "\(hours / 24)d ago"
     }
 }
+
+/// The old name, kept because `ago` and `countdown` are used all over.
+typealias QuotaBar = QuotaLine

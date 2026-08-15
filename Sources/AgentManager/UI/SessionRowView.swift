@@ -37,20 +37,16 @@ struct SessionRowView: View {
 
             metadata
 
-            if let quota {
-                QuotaBar(
-                    quota: quota,
-                    observed: quotaObserved,
-                    warn: prefs.warnThreshold,
-                    critical: prefs.criticalThreshold
-                )
-                .padding(.top, 11)
-                WindowLine(today: usageToday, week: usage, includeCacheReads: prefs.includeCacheReads)
-                    .padding(.top, 8)
-            } else {
-                WindowLine(today: usageToday, week: usage, includeCacheReads: prefs.includeCacheReads)
-                    .padding(.top, 8)
-            }
+            UsagePanel(
+                quota: quota,
+                quotaObserved: quotaObserved,
+                usage: usage,
+                usageToday: usageToday,
+                includeCacheReads: prefs.includeCacheReads,
+                warn: prefs.warnThreshold,
+                critical: prefs.criticalThreshold
+            )
+            .padding(.top, 9)
 
             if !session.subAgents.isEmpty { subAgentToggle }
         }
@@ -58,6 +54,11 @@ struct SessionRowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .glassTile(radius: 16, highlighted: isInspecting)
+        // The row is the control: clicking it raises the terminal that owns
+        // this session, so a listed session is always reachable.
+        .contentShape(Rectangle())
+        .onTapGesture { TerminalFocus.focus(pid: session.pid, tty: session.tty) }
+        .help("Show this session's terminal")
     }
 
     /// Branch, working directory and pid, set in monospace because they are

@@ -121,6 +121,7 @@ struct RunningSession: Equatable, Identifiable {
     var title: String?
     var cwd: String?
     var branch: String?
+    var tty: String?
     var subAgents: [SubAgent] = []
 
     var id: Int32 { pid }

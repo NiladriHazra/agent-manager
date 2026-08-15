@@ -74,28 +74,16 @@ struct AgentGroupView: View {
             }
             .buttonStyle(.plain)
 
-            if let quota = group.quota {
-                QuotaBar(
-                    quota: quota,
-                    observed: group.quotaObserved,
-                    warn: prefs.warnThreshold,
-                    critical: prefs.criticalThreshold
-                )
-                .padding(.top, 11)
-                WindowLine(
-                    today: group.usageToday,
-                    week: group.usage,
-                    includeCacheReads: prefs.includeCacheReads
-                )
-                .padding(.top, 8)
-            } else {
-                WindowLine(
-                    today: group.usageToday,
-                    week: group.usage,
-                    includeCacheReads: prefs.includeCacheReads
-                )
-                .padding(.top, 10)
-            }
+            UsagePanel(
+                quota: group.quota,
+                quotaObserved: group.quotaObserved,
+                usage: group.usage,
+                usageToday: group.usageToday,
+                includeCacheReads: prefs.includeCacheReads,
+                warn: prefs.warnThreshold,
+                critical: prefs.criticalThreshold
+            )
+            .padding(.top, 9)
 
         }
         .padding(.horizontal, 12)
