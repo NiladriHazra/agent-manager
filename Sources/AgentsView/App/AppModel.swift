@@ -65,6 +65,7 @@ final class AppModel: ObservableObject {
             if prefs.hideNotInstalled, snapshot.availability == .notInstalled, snapshot.sessions.isEmpty {
                 return false
             }
+            if !prefs.showIdleAgents, !snapshot.isRunning { return false }
             return true
         }
     }

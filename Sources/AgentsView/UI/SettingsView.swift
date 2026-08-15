@@ -63,6 +63,10 @@ struct SettingsView: View {
                 }
             }
             Section {
+                Toggle("Show idle agents", isOn: $prefs.showIdleAgents)
+                Text("Off by default, so the panel lists only what is working right now.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Hide agents that are not installed", isOn: $prefs.hideNotInstalled)
             }
         }

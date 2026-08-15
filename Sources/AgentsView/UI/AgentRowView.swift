@@ -63,10 +63,12 @@ struct AgentRowView: View {
     }
 
     @ViewBuilder private var trailing: some View {
-        if snapshot.sessions.count > 1 {
-            Pill(text: "\(snapshot.sessions.count) running", tone: .positive)
-        } else if snapshot.isRunning {
-            Pill(text: "running", tone: .positive)
+        if snapshot.isRunning {
+            Pill(
+                text: snapshot.sessions.count > 1 ? "\(snapshot.sessions.count) running" : "running",
+                tone: .positive,
+                showsLiveDot: true
+            )
         } else if let credits = snapshot.credits {
             Pill(text: "\(credits) cr", tone: .quota)
         }
@@ -81,18 +83,37 @@ struct AgentRowView: View {
     }
 }
 
+/// The StatusPill from the Klipeo design system: a tonal capsule whose colour
+/// carries the meaning. Running rows add a slowly breathing dot so activity is
+/// legible at a glance rather than only readable.
 struct Pill: View {
     let text: String
     let tone: Theme.Tone
+    var showsLiveDot = false
+
+    @State private var pulsing = false
 
     var body: some View {
-        Text(text)
-            .font(BrandFont.body(10, weight: .medium))
-            .foregroundStyle(tone.text)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(tone.fill))
-            .overlay(Capsule().strokeBorder(tone.stroke, lineWidth: 1))
+        HStack(spacing: 5) {
+            if showsLiveDot {
+                Circle()
+                    .fill(tone.text)
+                    .frame(width: 5, height: 5)
+                    .opacity(pulsing ? 0.35 : 1)
+                    .animation(
+                        .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+                        value: pulsing
+                    )
+                    .onAppear { pulsing = true }
+            }
+            Text(text)
+        }
+        .font(BrandFont.body(10, weight: .medium))
+        .foregroundStyle(tone.text)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(tone.fill))
+        .overlay(Capsule().strokeBorder(tone.stroke, lineWidth: 1))
     }
 }
 

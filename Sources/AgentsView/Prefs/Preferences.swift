@@ -1,4 +1,5 @@
-import SwiftUI
+import Combine
+import Foundation
 
 enum MenuBarMode: String, CaseIterable, Identifiable {
     case countAndQuota
@@ -18,30 +19,59 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Everything the settings window writes. Backed by UserDefaults so it survives
-/// relaunches without any storage code of our own.
+/// Settings, persisted to UserDefaults.
+///
+/// Deliberately not `@AppStorage`: that is a SwiftUI `DynamicProperty` and only
+/// publishes changes when it is declared inside a `View`. In an
+/// `ObservableObject` it still reads and writes, but `objectWillChange` never
+/// fires, so changing a setting would silently fail to update the menu bar.
 final class Preferences: ObservableObject {
     static let shared = Preferences()
 
-    @AppStorage("menuBarMode") var menuBarMode: MenuBarMode = .countAndQuota
-    @AppStorage("refreshSeconds") var refreshSeconds: Int = 60
-    @AppStorage("warnThreshold") var warnThreshold: Int = 20
-    @AppStorage("criticalThreshold") var criticalThreshold: Int = 10
-    @AppStorage("includeCacheReads") var includeCacheReads: Bool = false
-    @AppStorage("hideNotInstalled") var hideNotInstalled: Bool = true
-    @AppStorage("hiddenAgents") private var hiddenAgentsRaw: String = ""
+    private let defaults: UserDefaults
 
-    var hiddenAgents: Set<AgentID> {
-        get { Set(hiddenAgentsRaw.split(separator: ",").compactMap { AgentID(rawValue: String($0)) }) }
-        set { hiddenAgentsRaw = newValue.map(\.rawValue).sorted().joined(separator: ",") }
+    @Published var menuBarMode: MenuBarMode { didSet { defaults.set(menuBarMode.rawValue, forKey: Key.menuBarMode) } }
+    @Published var refreshSeconds: Int { didSet { defaults.set(refreshSeconds, forKey: Key.refreshSeconds) } }
+    @Published var warnThreshold: Int { didSet { defaults.set(warnThreshold, forKey: Key.warnThreshold) } }
+    @Published var criticalThreshold: Int { didSet { defaults.set(criticalThreshold, forKey: Key.criticalThreshold) } }
+    @Published var includeCacheReads: Bool { didSet { defaults.set(includeCacheReads, forKey: Key.includeCacheReads) } }
+    @Published var hideNotInstalled: Bool { didSet { defaults.set(hideNotInstalled, forKey: Key.hideNotInstalled) } }
+    /// Off by default: the panel answers "what is working right now", so idle
+    /// agents are noise unless you ask for them.
+    @Published var showIdleAgents: Bool { didSet { defaults.set(showIdleAgents, forKey: Key.showIdleAgents) } }
+    @Published var hiddenAgents: Set<AgentID> {
+        didSet { defaults.set(hiddenAgents.map(\.rawValue).sorted(), forKey: Key.hiddenAgents) }
+    }
+
+    private enum Key {
+        static let menuBarMode = "menuBarMode"
+        static let refreshSeconds = "refreshSeconds"
+        static let warnThreshold = "warnThreshold"
+        static let criticalThreshold = "criticalThreshold"
+        static let includeCacheReads = "includeCacheReads"
+        static let hideNotInstalled = "hideNotInstalled"
+        static let showIdleAgents = "showIdleAgents"
+        static let hiddenAgents = "hiddenAgents"
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        menuBarMode = (defaults.string(forKey: Key.menuBarMode)
+            .flatMap(MenuBarMode.init(rawValue:))) ?? .countAndQuota
+        refreshSeconds = defaults.object(forKey: Key.refreshSeconds) as? Int ?? 60
+        warnThreshold = defaults.object(forKey: Key.warnThreshold) as? Int ?? 20
+        criticalThreshold = defaults.object(forKey: Key.criticalThreshold) as? Int ?? 10
+        includeCacheReads = defaults.bool(forKey: Key.includeCacheReads)
+        hideNotInstalled = defaults.object(forKey: Key.hideNotInstalled) as? Bool ?? true
+        showIdleAgents = defaults.bool(forKey: Key.showIdleAgents)
+        hiddenAgents = Set(
+            (defaults.stringArray(forKey: Key.hiddenAgents) ?? []).compactMap(AgentID.init(rawValue:))
+        )
     }
 
     func isHidden(_ agent: AgentID) -> Bool { hiddenAgents.contains(agent) }
 
     func setHidden(_ agent: AgentID, _ hidden: Bool) {
-        var current = hiddenAgents
-        if hidden { current.insert(agent) } else { current.remove(agent) }
-        hiddenAgents = current
-        objectWillChange.send()
+        if hidden { hiddenAgents.insert(agent) } else { hiddenAgents.remove(agent) }
     }
 }

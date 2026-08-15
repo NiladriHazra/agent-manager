@@ -40,11 +40,15 @@ open dist/agents-view.app
 The build is ad-hoc signed, so if you move the app somewhere Gatekeeper is
 suspicious of, right-click it and choose Open the first time.
 
+The panel lists only agents that are running right now, since that is the
+question it exists to answer. Idle ones are hidden until you turn them on.
+
 ## Settings
 
 Open them from the dropdown footer:
 
-- which agents appear, and whether to hide ones that are not installed
+- which agents appear, whether to show idle ones, and whether to hide ones that
+  are not installed
 - what the menu bar shows: count and quota, count only, quota only, or icon only
 - refresh interval
 - amber and red thresholds for a low quota
@@ -78,7 +82,7 @@ No code path can read an entire session file.
   else, so they are excluded from the headline figure by default. The setting is
   there if you want them.
 - The Codex quota is per account. If you use more than one, you see one of them.
-- The Grok mark is a hand-drawn stand-in; the others are the vendors' own.
+- Logos are the vendors' own marks, in their real brand colours.
 
 ## Licence
 

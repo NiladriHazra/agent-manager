@@ -8,21 +8,32 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            ScrollView {
-                VStack(spacing: 6) {
+            // A plain stack, not a ScrollView: inside MenuBarExtra's window a
+            // ScrollView collapses to zero height, which left the panel showing
+            // its header and footer with nothing in between. The list is bounded
+            // by the number of agents, so it never needs to scroll.
+            VStack(spacing: 6) {
+                if model.visibleSnapshots.isEmpty {
+                    emptyState
+                } else {
                     ForEach(model.visibleSnapshots) { snapshot in
                         AgentRowView(snapshot: snapshot)
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 10)
             }
-            .frame(maxHeight: 420)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
 
             footer
         }
         .frame(width: 320)
-        .background(Theme.surface)
+        .background {
+            if RenderMode.isOffscreen {
+                Theme.surface
+            } else {
+                VisualEffectBackground().overlay(Color.black.opacity(0.28))
+            }
+        }
         .onAppear { model.menuOpened() }
         .onDisappear { model.menuClosed() }
     }
@@ -43,6 +54,27 @@ struct MenuContentView: View {
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, 10)
+    }
+
+    /// The list only shows what is working, so it is empty most of the time.
+    /// Say so, and keep any real quota visible rather than showing a blank box.
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text("Nothing running")
+                .font(BrandFont.body(13, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+            if let headline = model.headlineQuota {
+                Text("\(headline.agent.displayName) has \(Int(headline.quota.remainingPercent))% left this week")
+                    .font(BrandFont.body(11))
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            Text("Idle agents are hidden. Turn them on in Settings.")
+                .font(BrandFont.body(10))
+                .foregroundStyle(Theme.textTertiary)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
     }
 
     private var footer: some View {
