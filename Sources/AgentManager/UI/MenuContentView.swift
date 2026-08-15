@@ -11,16 +11,15 @@ enum PanelTab: String, CaseIterable, Identifiable {
 struct MenuContentView: View {
     @ObservedObject var model: AppModel
     @State private var tab: PanelTab = .working
-    @State private var inspecting: Int32?
+    @State private var detail: DetailTarget?
     @State private var primed = false
 
     var body: some View {
         HStack(spacing: 0) {
             main
-            if let inspected = inspectedSession {
+            if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))
-                SubAgentPanel(session: inspected.session) { inspecting = nil }
-                    .frame(width: 268)
+                sidePanel.frame(width: 288)
             }
         }
         .background(RenderMode.isOffscreen ? AnyView(Theme.surface) : AnyView(Color.clear))
@@ -29,7 +28,7 @@ struct MenuContentView: View {
             // Offscreen renders open the side panel so it can be inspected.
             guard RenderMode.isOffscreen, !primed else { return }
             primed = true
-            inspecting = groups.flatMap(\.sessions).first { !$0.subAgents.isEmpty }?.pid
+            detail = groups.first { $0.sessions.count > 1 }.map { .sessions($0.agent) }
         }
         .onDisappear { model.menuClosed() }
     }
@@ -44,7 +43,7 @@ struct MenuContentView: View {
                     emptyState
                 } else {
                     ForEach(groups, id: \.agent) { group in
-                        AgentGroupView(group: group, inspecting: $inspecting)
+                        AgentGroupView(group: group, inspecting: .constant(nil), detail: $detail)
                     }
                 }
             }
@@ -72,14 +71,50 @@ struct MenuContentView: View {
         }
     }
 
-    private var inspectedSession: (agent: AgentID, session: RunningSession)? {
-        guard let inspecting else { return nil }
-        for group in groups {
-            if let match = group.sessions.first(where: { $0.pid == inspecting }) {
-                return (group.agent, match)
+    @ViewBuilder private var sidePanel: some View {
+        switch detail {
+        case .sessions(let agent):
+            if let group = groups.first(where: { $0.agent == agent }) {
+                DetailPanel(
+                    title: agent.displayName,
+                    count: group.sessions.count,
+                    activeCount: group.sessions.filter { $0.activity.isWorking }.count,
+                    onClose: { detail = nil },
+                    rows: AnyView(
+                        VStack(spacing: 7) {
+                            ForEach(group.sessions) { session in
+                                SessionRowView(
+                                    agent: agent,
+                                    session: session,
+                                    quota: nil,
+                                    quotaObserved: nil,
+                                    usage: nil,
+                                    usageToday: nil,
+                                    isInspecting: false,
+                                    onInspect: { detail = .subAgents(pid: session.pid) }
+                                )
+                            }
+                        }
+                    )
+                )
             }
+        case .subAgents(let pid):
+            if let session = groups.flatMap(\.sessions).first(where: { $0.pid == pid }) {
+                DetailPanel(
+                    title: "Sub-agents",
+                    count: session.subAgents.count,
+                    activeCount: session.subAgents.filter(\.isWorking).count,
+                    onClose: { detail = nil },
+                    rows: AnyView(
+                        VStack(spacing: 5) {
+                            ForEach(session.subAgents) { SubAgentRow(subAgent: $0) }
+                        }
+                    )
+                )
+            }
+        case .none:
+            EmptyView()
         }
-        return nil
     }
 
     private var header: some View {
@@ -99,7 +134,7 @@ struct MenuContentView: View {
             Spacer()
             ForEach(PanelTab.allCases) { option in
                 let count = option == .working ? model.workingCount : model.openCount
-                Button { tab = option; inspecting = nil } label: {
+                Button { tab = option; detail = nil } label: {
                     HStack(spacing: 6) {
                         Text(option.label).font(BrandFont.body(11, weight: .semibold))
                         Text(verbatim: "\(count)")

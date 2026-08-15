@@ -8,9 +8,17 @@ import SwiftUI
 struct AgentGroupView: View {
     let group: AgentGroup
     @Binding var inspecting: Int32?
+    /// Owned by the panel: these rows are rebuilt on every refresh, so any
+    /// state they held would be thrown away mid-interaction.
+    @Binding var detail: DetailTarget?
     @ObservedObject private var prefs = Preferences.shared
-    @State private var expanded = false
     @State private var hovered = false
+
+    private var expanded: Bool { detail == .sessions(group.agent) }
+
+    private func toggleExpanded() {
+        detail = expanded ? nil : .sessions(group.agent)
+    }
 
     private var working: Int { group.sessions.filter { $0.activity.isWorking }.count }
     private var isSingle: Bool { group.sessions.count == 1 }
@@ -26,8 +34,8 @@ struct AgentGroupView: View {
                 quotaObserved: group.quotaObserved,
                 usage: group.usage,
                 usageToday: group.usageToday,
-                isInspecting: inspecting == only.pid,
-                onInspect: { inspecting = inspecting == only.pid ? nil : only.pid }
+                isInspecting: detail == .subAgents(pid: only.pid),
+                onInspect: { detail = detail == .subAgents(pid: only.pid) ? nil : .subAgents(pid: only.pid) }
             )
         } else {
             stacked
@@ -36,7 +44,7 @@ struct AgentGroupView: View {
 
     private var stacked: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { expanded.toggle() } label: {
+            Button(action: toggleExpanded) {
                 HStack(spacing: 11) {
                     StackedIcons(agent: group.agent, count: group.sessions.count, lit: working > 0)
 
@@ -96,23 +104,6 @@ struct AgentGroupView: View {
                     .padding(.top, 10)
             }
 
-            if expanded {
-                VStack(spacing: 7) {
-                    ForEach(group.sessions) { session in
-                        SessionRowView(
-                            agent: group.agent,
-                            session: session,
-                            quota: nil,
-                            quotaObserved: nil,
-                            usage: nil,
-                            usageToday: nil,
-                            isInspecting: inspecting == session.pid,
-                            onInspect: { inspecting = inspecting == session.pid ? nil : session.pid }
-                        )
-                    }
-                }
-                .padding(.top, 9)
-            }
         }
         .padding(14)
         .glassTile(radius: 18, highlighted: hovered || expanded)
