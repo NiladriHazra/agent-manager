@@ -57,9 +57,16 @@ final class AppModel: ObservableObject {
     func headlinePercent(for agent: AgentID) -> Int? {
         guard let snapshot = snapshots.first(where: { $0.agent == agent }) else { return nil }
         if let quota = snapshot.quota { return Int(quota.usedPercent) }
-        let contexts = snapshot.sessions.compactMap { $0.chat?.contextFraction }
-        guard let fullest = contexts.max(), fullest > 0 else { return nil }
-        return Int(fullest * 100)
+        // The session you are actually in: working first, then the one that
+        // wrote most recently. Taking the fullest made the number jump between
+        // unrelated sessions on every refresh.
+        let ordered = snapshot.sessions.sorted { lhs, rhs in
+            if lhs.activity.isWorking != rhs.activity.isWorking { return lhs.activity.isWorking }
+            return (lhs.activity.since ?? .distantPast) > (rhs.activity.since ?? .distantPast)
+        }
+        guard let fraction = ordered.compactMap({ $0.chat?.contextFraction }).first,
+              fraction > 0 else { return nil }
+        return Int(fraction * 100)
     }
 
     /// Agents the user picked that actually have a number today.

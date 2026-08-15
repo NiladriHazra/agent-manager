@@ -171,11 +171,34 @@ struct ClaudeProvider: AgentProvider {
         return snapshot
     }
 
+    /// This session's transcript: by id when known, otherwise the newest file
+    /// inside the project folder for its working directory. Never the newest
+    /// file globally, which belongs to whichever session wrote last.
+    private static func transcript(
+        for session: RunningSession,
+        among transcripts: [(url: URL, written: Date)],
+        projectRoot: URL
+    ) -> (url: URL, written: Date)? {
+        if let id = session.sessionID,
+           let match = transcripts.first(where: { $0.url.lastPathComponent.contains(id) }) {
+            return match
+        }
+        guard let cwd = session.cwd else { return nil }
+        // Claude encodes a project path by replacing every "/" and "." with "-".
+        let folder = cwd
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ".", with: "-")
+        return transcripts.first { $0.url.deletingLastPathComponent().lastPathComponent == folder }
+    }
+
     /// Adds the "what is it working on" line: exact when the process carries
     /// `--resume <uuid>`, otherwise the newest session sharing its cwd.
     private func enrich(_ sessions: [RunningSession]) async -> [RunningSession] {
         var result: [RunningSession] = []
         var claimed = Set<String>()
+        // Enumerated once. Doing it per session walked the whole 548 MB tree
+        // four times over on every refresh.
+        let transcripts = UsageIndex.transcriptsWithDates(in: [root])
 
         for var session in sessions {
             if let id = session.sessionID, let meta = await index.sessionMeta(id: id) {
@@ -189,13 +212,21 @@ struct ClaudeProvider: AgentProvider {
                 // transcript in the same directory. Claiming it stops several
                 // concurrent sessions all reporting the same title.
                 claimed.insert(match.id)
+                // Carried forward so the turn state below reads THIS session's
+                // transcript. It used to fall back to the newest file anywhere,
+                // so a session that had just ended a turn made every other
+                // Claude row read as waiting.
+                session.sessionID = match.id
                 session.title = match.meta.title
                 session.branch = match.meta.branch
             } else {
                 session.title = nil
             }
-            let transcript = UsageIndex.newestTranscript(in: [root], matching: session.sessionID)
-                ?? UsageIndex.newestTranscript(in: [root])
+            let transcript = Self.transcript(
+                for: session,
+                among: transcripts,
+                projectRoot: root
+            )
             session.activity = activity(
                 lastWrite: transcript?.written,
                 transcript: transcript?.url,

@@ -26,13 +26,16 @@ struct MenuBarPreview: View {
                 if prefs.showPercentages {
                     let readings = Array(model.menuBarReadings.prefix(prefs.maxMenuBarAgents))
                     ForEach(readings, id: \.agent) { reading in
+                        let style = prefs.style(for: reading.agent)
                         HStack(spacing: 3) {
-                            if readings.count > 1 {
+                            if style.showsMark {
                                 AgentLogo(agent: reading.agent).frame(width: 11, height: 11)
                             }
-                            Text("\(reading.percent)%")
-                                .font(.system(size: 11.5, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.white)
+                            if style.showsPercent {
+                                Text("\(reading.percent)%")
+                                    .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.white)
+                            }
                         }
                     }
                     if readings.isEmpty {

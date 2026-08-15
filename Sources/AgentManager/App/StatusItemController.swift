@@ -70,20 +70,24 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
         guard prefs.showPercentages else { return text }
         let readings = model.menuBarReadings.prefix(prefs.maxMenuBarAgents)
-        let showsMarks = readings.count > 1
 
         for (index, reading) in readings.enumerated() {
-            let separator = index == 0 && !prefs.showAgentCount ? " " : (showsMarks ? "  " : " · ")
+            let style = prefs.style(for: reading.agent)
+            let separator = index == 0 && !prefs.showAgentCount ? " " : (readings.count > 1 ? "  " : " · ")
             text.append(NSAttributedString(string: separator, attributes: attributes))
 
-            if showsMarks, let mark = MenuBarGlyph.mark(for: reading.agent) {
+            if style.showsMark, let mark = MenuBarGlyph.mark(for: reading.agent) {
                 let attachment = NSTextAttachment()
                 attachment.image = mark
                 attachment.bounds = CGRect(x: 0, y: -2, width: 11, height: 11)
                 text.append(NSAttributedString(attachment: attachment))
-                text.append(NSAttributedString(string: " ", attributes: attributes))
+                if style.showsPercent {
+                    text.append(NSAttributedString(string: " ", attributes: attributes))
+                }
             }
-            text.append(NSAttributedString(string: "\(reading.percent)%", attributes: attributes))
+            if style.showsPercent {
+                text.append(NSAttributedString(string: "\(reading.percent)%", attributes: attributes))
+            }
         }
         return text
     }

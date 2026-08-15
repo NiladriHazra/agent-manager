@@ -40,6 +40,10 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(menuBarAgents.map(\.rawValue), forKey: Key.menuBarAgents) }
     }
     @Published var maxMenuBarAgents: Int { didSet { defaults.set(maxMenuBarAgents, forKey: Key.maxMenuBarAgents) } }
+    /// Per agent: mark, number, or both.
+    @Published var menuBarStyles: [String: String] {
+        didSet { defaults.set(menuBarStyles, forKey: Key.menuBarStyles) }
+    }
     @Published var refreshSeconds: Int { didSet { defaults.set(refreshSeconds, forKey: Key.refreshSeconds) } }
     @Published var warnThreshold: Int { didSet { defaults.set(warnThreshold, forKey: Key.warnThreshold) } }
     @Published var criticalThreshold: Int { didSet { defaults.set(criticalThreshold, forKey: Key.criticalThreshold) } }
@@ -67,6 +71,7 @@ final class Preferences: ObservableObject {
         static let showPercentages = "showPercentages"
         static let menuBarAgents = "menuBarAgents"
         static let maxMenuBarAgents = "maxMenuBarAgents"
+        static let menuBarStyles = "menuBarStyles"
         static let refreshSeconds = "refreshSeconds"
         static let warnThreshold = "warnThreshold"
         static let criticalThreshold = "criticalThreshold"
@@ -84,6 +89,7 @@ final class Preferences: ObservableObject {
         showAgentCount = defaults.object(forKey: Key.showAgentCount) as? Bool ?? true
         showPercentages = defaults.object(forKey: Key.showPercentages) as? Bool ?? true
         maxMenuBarAgents = defaults.object(forKey: Key.maxMenuBarAgents) as? Int ?? 2
+        menuBarStyles = defaults.dictionary(forKey: Key.menuBarStyles) as? [String: String] ?? [:]
         // Codex by default: it is the only agent that publishes a real limit.
         menuBarAgents = (defaults.array(forKey: Key.menuBarAgents) as? [String])?
             .compactMap(AgentID.init(rawValue:)) ?? [.codex]
@@ -142,5 +148,22 @@ final class Preferences: ObservableObject {
 
     func menuBarBinding(for agent: AgentID) -> Binding<Bool> {
         Binding(get: { self.isInMenuBar(agent) }, set: { self.setInMenuBar(agent, $0) })
+    }
+
+    /// A single agent defaults to its number alone: with nothing to tell apart,
+    /// a mark beside the Klipeo one is just clutter.
+    func style(for agent: AgentID) -> MenuBarStyle {
+        if let stored = menuBarStyles[agent.rawValue].flatMap(MenuBarStyle.init(rawValue:)) {
+            return stored
+        }
+        return menuBarAgents.count > 1 ? .markAndPercent : .percentOnly
+    }
+
+    func setStyle(_ style: MenuBarStyle, for agent: AgentID) {
+        menuBarStyles[agent.rawValue] = style.rawValue
+    }
+
+    func styleBinding(for agent: AgentID) -> Binding<MenuBarStyle> {
+        Binding(get: { self.style(for: agent) }, set: { self.setStyle($0, for: agent) })
     }
 }

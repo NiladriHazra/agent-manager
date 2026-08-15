@@ -21,11 +21,13 @@ actor UsageIndex {
     }
 
     private struct Store: Codable {
-        var version = 4
+        var version = 5
         var files: [String: FileState] = [:]
         var buckets: [String: [String: Bucket]] = [:]
         var titles: [String: SessionMeta] = [:]
         var chats: [String: ChatStats] = [:]
+        /// Largest context ever seen per model, which resolves its tier.
+        var modelPeaks: [String: Int] = [:]
     }
 
     struct SessionMeta: Codable {
@@ -85,8 +87,19 @@ actor UsageIndex {
         load()
         let cutoff = Date().addingTimeInterval(-Double(windowDays) * 86_400)
 
-        for file in Self.transcripts(in: roots, modifiedAfter: cutoff) {
+        let files = Self.transcripts(in: roots, modifiedAfter: cutoff)
+        let trace = ProcessInfo.processInfo.environment["AGENT_MANAGER_TRACE"] != nil
+        var slow: [(String, Double)] = []
+        for file in files {
+            let started = Date()
             ingest(file: file, agent: agent)
+            let spent = Date().timeIntervalSince(started)
+            if trace, spent > 0.05 { slow.append((file.lastPathComponent, spent)) }
+        }
+        if trace {
+            FileHandle.standardError.write(Data(
+                "index: \(files.count) files, slow: \(slow.map { "\($0.0) \(Int($0.1 * 1000))ms" })\n".utf8
+            ))
         }
 
         prune(before: Date().addingTimeInterval(-14 * 86_400))
@@ -98,6 +111,26 @@ actor UsageIndex {
     /// for whether the agent is actually doing anything.
     static func lastWrite(in roots: [URL], matching sessionID: String? = nil) -> Date? {
         newestTranscript(in: roots, matching: sessionID)?.written
+    }
+
+    /// Every transcript with its write time, newest first. One walk, reused by
+    /// every session in a probe.
+    static func transcriptsWithDates(in roots: [URL]) -> [(url: URL, written: Date)] {
+        var found: [(url: URL, written: Date)] = []
+        for root in roots {
+            guard let walker = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            ) else { continue }
+            for case let url as URL in walker {
+                guard url.pathExtension == "jsonl" else { continue }
+                guard let stamp = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate else { continue }
+                found.append((url, stamp))
+            }
+        }
+        return found.sorted { $0.written > $1.written }
     }
 
     /// The same scan, keeping the file itself: reading the last record is what
@@ -126,7 +159,11 @@ actor UsageIndex {
 
     func chat(id: String) -> ChatStats? {
         load()
-        return store.chats[id]
+        guard var chat = store.chats[id] else { return nil }
+        if let model = chat.model, let peak = store.modelPeaks[model] {
+            chat.windowTokens = peak > 200_000 ? 1_000_000 : 200_000
+        }
+        return chat
     }
 
     func sessionMeta(id: String) -> SessionMeta? {
@@ -161,7 +198,11 @@ actor UsageIndex {
 
         // Shrunk means truncation or replacement; buckets are additive and
         // cannot be un-added, so the safest correct move is a clean rebuild.
-        if size < state.offset {
+        //
+        // The tolerance matters: the chunk loop adds one byte per chunk for the
+        // separating newline, so a long file could finish a byte or two past
+        // its own size and trigger a full 548 MB rebuild on every refresh.
+        if size < state.offset - 8 {
             rebuild()
             state = FileState(path: file.path, size: 0, offset: 0)
         }
@@ -189,7 +230,7 @@ actor UsageIndex {
         }
 
         state.path = file.path
-        state.offset = consumed
+        state.offset = min(consumed, size)
         state.size = size
         store.files[key] = state
     }
@@ -227,7 +268,10 @@ actor UsageIndex {
                 + (usage.cache_read_input_tokens ?? 0)
                 + (usage.cache_creation_input_tokens ?? 0)
             if context > 0 { chat.contextTokens = context }
-            if let model = record.message?.model { chat.model = model }
+            if let model = record.message?.model {
+                chat.model = model
+                store.modelPeaks[model] = max(store.modelPeaks[model] ?? 0, context)
+            }
             if (usage.output_tokens ?? 0) > 0 { chat.turns += 1 }
             chat.thinking += usage.output_tokens_details?.thinking_tokens ?? 0
             store.chats[session] = chat

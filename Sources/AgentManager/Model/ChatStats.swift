@@ -18,11 +18,18 @@ struct ChatStats: Codable, Equatable {
     /// Only agents that publish a price do this: OpenCode and Grok.
     var cost: Double?
 
-    /// The transcript records a model family but not which context tier the
-    /// session was opened with, so the tier is inferred from what the context
-    /// has actually reached: nothing can exceed its own window.
+    /// Resolved from the largest context ever observed for this model, which
+    /// the index tracks across every session. Nothing can exceed its own
+    /// window, so one session that reached 397K proves the whole model is on
+    /// the 1M tier — including sessions currently sitting at 115K.
+    var windowTokens: Int?
+
+    /// The transcript records a model family but never the context tier, so
+    /// this is the only signal available. Falling back to a per-session guess
+    /// made the figure flip between 96% and 61% as different sessions became
+    /// the fullest, which is why the tier is resolved per model instead.
     var contextWindow: Int {
-        contextTokens > 200_000 ? 1_000_000 : 200_000
+        windowTokens ?? (contextTokens > 200_000 ? 1_000_000 : 200_000)
     }
 
     var contextFraction: Double {

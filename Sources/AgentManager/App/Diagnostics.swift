@@ -41,9 +41,11 @@ enum Diagnostics {
         let providers = allProviders(index: index)
 
         print("")
+        var all: [AgentSnapshot] = []
         for provider in providers {
             let started = Date()
             let snapshot = await provider.probe(sessions: running.filter { $0.agent == provider.agent })
+            all.append(snapshot)
             var line = "\(pad(provider.agent.rawValue, 12))\(pad(describe(snapshot.availability), 16))\(pad(ms(since: started), 9))"
             if let quota = snapshot.quota {
                 line += "quota \(Int(quota.remainingPercent))% left of \(quota.windowLabel), resets \(QuotaBar.countdown(to: quota.resetsAt))"
@@ -70,6 +72,20 @@ enum Diagnostics {
                 print("            \u{21B3} \(pad(state, 16))\(pad(session.activityLine, 34))\(pad(session.tty ?? "-", 14))\(focus)")
             }
         }
+        print("\nmenu bar reads: " + menuLine(all))
+    }
+
+    static func menuLine(_ snapshots: [AgentSnapshot]) -> String {
+        snapshots.compactMap { snapshot -> String? in
+            if let quota = snapshot.quota { return "\(snapshot.agent.rawValue) \(Int(quota.usedPercent))% quota" }
+            let ordered = snapshot.sessions.sorted { lhs, rhs in
+                if lhs.activity.isWorking != rhs.activity.isWorking { return lhs.activity.isWorking }
+                return (lhs.activity.since ?? .distantPast) > (rhs.activity.since ?? .distantPast)
+            }
+            guard let chat = ordered.compactMap({ $0.chat }).first, chat.contextTokens > 0 else { return nil }
+            return "\(snapshot.agent.rawValue) \(Int(chat.contextFraction * 100))% context "
+                + "(\(chat.contextTokens)/\(chat.contextWindow), \(chat.model ?? "?"))"
+        }.joined(separator: "  |  ")
     }
 
     private static func describe(_ availability: Availability) -> String {

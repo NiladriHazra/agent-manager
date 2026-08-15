@@ -120,6 +120,14 @@ struct SettingsView: View {
                                         .foregroundStyle(.white.opacity(0.4))
                                 }
                                 Spacer()
+                                if prefs.isInMenuBar(agent) {
+                                    Picker("", selection: prefs.styleBinding(for: agent)) {
+                                        ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 108)
+                                }
                                 Toggle("", isOn: prefs.menuBarBinding(for: agent))
                                     .labelsHidden()
                                     .toggleStyle(.switch)
