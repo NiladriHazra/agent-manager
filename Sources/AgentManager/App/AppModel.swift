@@ -86,10 +86,16 @@ final class AppModel: ObservableObject {
         let providers = self.providers
         Task.detached(priority: .utility) {
             let running = ProcessScanner.runningAgents()
-            var built: [AgentSnapshot] = []
-            for provider in providers {
-                let mine = running.filter { $0.agent == provider.agent }
-                built.append(await provider.probe(sessions: mine))
+            // Concurrently: probing in sequence made every refresh as slow as
+            // the sum of all providers, and Codex alone took most of a second.
+            let built = await withTaskGroup(of: (Int, AgentSnapshot).self) { group in
+                for (index, provider) in providers.enumerated() {
+                    let mine = running.filter { $0.agent == provider.agent }
+                    group.addTask { (index, await provider.probe(sessions: mine)) }
+                }
+                var collected: [(Int, AgentSnapshot)] = []
+                for await pair in group { collected.append(pair) }
+                return collected.sorted { $0.0 < $1.0 }.map(\.1)
             }
             let result = built
             await MainActor.run {
@@ -104,7 +110,9 @@ final class AppModel: ObservableObject {
         timer?.invalidate()
         // An open panel is being read right now, so it refreshes far more
         // often; a closed one only needs to keep the menu bar roughly current.
-        let interval = menuIsOpen ? 3 : TimeInterval(max(10, Preferences.shared.refreshSeconds))
+        // An open panel is being read right now: probes run concurrently and
+        // unchanged files are cached, so a one-second beat is affordable.
+        let interval = menuIsOpen ? 1 : TimeInterval(max(10, Preferences.shared.refreshSeconds))
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }

@@ -21,6 +21,23 @@ enum TurnState {
         }
     }
 
+    /// OpenCode keeps its transcript in SQLite, not JSONL. Its last message
+    /// carries `time.completed` once the turn is done — including a turn that
+    /// was interrupted, which is still the user's move next.
+    static func openCode(dbPath: String, sessionID: String?) -> TurnState {
+        let filter = sessionID.map { "WHERE session_id = '\($0.replacingOccurrences(of: "'", with: "''"))'" } ?? ""
+        guard let row = SQLiteReader.queryRow(
+            path: dbPath,
+            sql: "SELECT data FROM message \(filter) ORDER BY time_created DESC LIMIT 1;"
+        ), let raw = row.first, let data = raw.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return .busy }
+
+        guard (object["role"] as? String) == "assistant" else { return .busy }
+        let time = object["time"] as? [String: Any]
+        return time?["completed"] != nil ? .awaitingUser : .busy
+    }
+
     /// Codex closes a turn with a `task_complete` event. Anything logged after
     /// it means a new turn already started.
     private static func codex(_ url: URL) -> TurnState {

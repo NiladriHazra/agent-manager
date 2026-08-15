@@ -275,9 +275,12 @@ struct OpenCodeProvider: AgentProvider {
         }
 
         let openCodeWrite = (try? FileManager.default.attributesOfItem(atPath: dbPath)[.modificationDate] as? Date) ?? nil
+        let turn = TurnState.openCode(dbPath: dbPath, sessionID: nil)
         snapshot.sessions = sessions.map {
             var copy = $0
-            copy.activity = activity(lastWrite: openCodeWrite)
+            copy.activity = turn == .awaitingUser
+                ? .waiting(since: openCodeWrite)
+                : activity(lastWrite: openCodeWrite)
             return copy
         }
         // Per-session detail, matched on the directory the process runs in.

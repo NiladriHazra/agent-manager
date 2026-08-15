@@ -12,6 +12,17 @@ import Foundation
 /// - OpenCode aggregates in SQLite (handled by its provider)
 /// - Cursor, Gemini, Antigravity and Hermes record nothing usable
 enum TokenSources {
+    /// Cumulative totals keyed by file and size. Codex rewrites the same
+    /// growing rollout, so a file whose size has not moved cannot have new
+    /// totals, and re-reading it every few seconds was most of a refresh.
+    private struct CachedTotals {
+        let size: Int
+        let usage: Usage
+    }
+
+    nonisolated(unsafe) private static var codexCache: [String: CachedTotals] = [:]
+    private static let cacheLock = NSLock()
+
     /// Codex totals are cumulative per session, so the newest record in each
     /// session touched inside the window is summed. Tail-read only: a single
     /// session file reaches 295 MB.
@@ -24,6 +35,22 @@ enum TokenSources {
         let decoder = JSONDecoder()
 
         for file in files {
+            let size = ((try? FileManager.default
+                .attributesOfItem(atPath: file.path))?[.size] as? Int) ?? 0
+
+            cacheLock.lock()
+            let cached = codexCache[file.path]
+            cacheLock.unlock()
+
+            if let cached, size > 0, cached.size == size {
+                found = true
+                usage.input += cached.usage.input
+                usage.output += cached.usage.output
+                usage.cacheRead += cached.usage.cacheRead
+                usage.cacheCreate += cached.usage.cacheCreate
+                continue
+            }
+
             guard let totals = TailReader.newestLine(
                 in: file,
                 containing: "\"total_token_usage\"",
@@ -35,10 +62,22 @@ enum TokenSources {
             ) else { continue }
 
             found = true
-            usage.input += totals.input_tokens ?? 0
-            usage.output += totals.output_tokens ?? 0
-            usage.cacheRead += totals.cached_input_tokens ?? 0
-            usage.cacheCreate += totals.cache_write_input_tokens ?? 0
+            var file_usage = Usage()
+            file_usage.input = totals.input_tokens ?? 0
+            file_usage.output = totals.output_tokens ?? 0
+            file_usage.cacheRead = totals.cached_input_tokens ?? 0
+            file_usage.cacheCreate = totals.cache_write_input_tokens ?? 0
+
+            usage.input += file_usage.input
+            usage.output += file_usage.output
+            usage.cacheRead += file_usage.cacheRead
+            usage.cacheCreate += file_usage.cacheCreate
+
+            if size > 0 {
+                cacheLock.lock()
+                codexCache[file.path] = CachedTotals(size: size, usage: file_usage)
+                cacheLock.unlock()
+            }
         }
         return found ? usage : nil
     }

@@ -146,7 +146,7 @@ struct WindowLine: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             side(label: "today", usage: today, resets: midnightCountdown)
             Spacer(minLength: 10)
-            side(label: "7 days", usage: week, resets: rollingWindow, trailing: true)
+            side(label: "7 days", usage: week, resets: spentLine ?? rollingWindow, trailing: true)
         }
         .font(BrandFont.body(10))
     }
@@ -166,6 +166,13 @@ struct WindowLine: View {
                 .font(BrandFont.body(9))
                 .foregroundStyle(.white.opacity(0.28))
         }
+    }
+
+    /// Only OpenCode and Grok publish a price, so this replaces the window
+    /// caption rather than adding a line nobody else can fill.
+    private var spentLine: Text? {
+        guard let cost = week?.cost, cost > 0 else { return nil }
+        return Text(String(format: "$%.2f spent, 7 days", cost))
     }
 
     /// A rolling window has no reset instant, so it states the span it covers

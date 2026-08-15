@@ -191,12 +191,11 @@ struct SubAgentRow: View {
     let subAgent: SubAgent
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             WaveLoader(
                 color: subAgent.isWorking ? StatusPill.Tone.positive.dot : .white.opacity(0.38),
                 animated: subAgent.isWorking
             )
-            .padding(.top, 0)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(subAgent.label)
