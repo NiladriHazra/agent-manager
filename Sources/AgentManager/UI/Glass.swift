@@ -8,8 +8,26 @@ import SwiftUI
 struct GlassTile: ViewModifier {
     var radius: CGFloat = 20
     var highlighted = false
+    /// Tiles that respond to a click ask for the material's own pointer
+    /// reaction rather than a hand-rolled hover fill.
+    var interactive = false
 
     func body(content: Content) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            content.glassEffect(
+                interactive
+                    ? .regular.tint(.white.opacity(highlighted ? 0.10 : 0.03)).interactive()
+                    : .regular.tint(.white.opacity(highlighted ? 0.10 : 0.03)),
+                in: .rect(cornerRadius: radius)
+            )
+        } else {
+            legacy(content)
+        }
+    }
+
+    /// Pre-26 fallback: material plus a hand-painted rim, which is the closest
+    /// approximation available without the real material.
+    private func legacy(_ content: Content) -> some View {
         content
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
@@ -42,13 +60,12 @@ struct GlassTile: ViewModifier {
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
     }
 }
 
 extension View {
-    func glassTile(radius: CGFloat = 20, highlighted: Bool = false) -> some View {
-        modifier(GlassTile(radius: radius, highlighted: highlighted))
+    func glassTile(radius: CGFloat = 20, highlighted: Bool = false, interactive: Bool = false) -> some View {
+        modifier(GlassTile(radius: radius, highlighted: highlighted, interactive: interactive))
     }
 
     /// Real glass for a capsule, so pills and chips get the same treatment as
@@ -66,6 +83,17 @@ extension View {
                 Capsule().fill(.ultraThinMaterial)
                     .overlay(Capsule().fill(tint ?? .clear))
             )
+        }
+    }
+
+    /// Liquid Glass renders its own edge, adapted to whatever is behind it, so
+    /// the painted hairline belongs only to the pre-26 fallback.
+    @ViewBuilder
+    func glassRim(_ color: Color) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            self
+        } else {
+            overlay(Capsule().strokeBorder(color, lineWidth: 0.8))
         }
     }
 
@@ -132,22 +160,218 @@ struct StatusPill: View {
         }
     }
 
+    /// What sits before the label. A live state gets motion instead of a dot,
+    /// ported from prompt-kit's `typing` and `text-shimmer` loaders.
+    enum Indicator {
+        case none
+        case dot
+        /// Three dots cycling, for something actively producing output.
+        case typing
+        /// No leading mark; the label itself shimmers, for something parked.
+        case shimmer
+    }
+
     let text: String
     let tone: Tone
-    var showsDot = false
+    var indicator: Indicator = .none
 
     var body: some View {
         HStack(spacing: 5) {
-            if showsDot {
-                Circle().fill(tone.dot).frame(width: 5, height: 5)
+            switch indicator {
+            case .dot: StatusDot(color: tone.dot)
+            case .typing: TypingLoader(color: tone.dot)
+            case .none, .shimmer: EmptyView()
             }
-            Text(text)
-                .font(BrandFont.body(10.5, weight: .medium))
-                .foregroundStyle(.white)
+            label
         }
         .padding(.horizontal, 9)
         .frame(height: 21)
-        .glassCapsule(tint: tone.fill)
-        .overlay(Capsule().strokeBorder(tone.border, lineWidth: 0.8))
+        // Flat tonal capsule, exactly like the Klipeo StatusPill: a solid fill,
+        // a hairline tinted border and a light top edge. No glass, no shadow —
+        // glass here cast a halo that read as a smudge behind the pill.
+        .background(Capsule().fill(tone.fill))
+        .overlay(
+            Capsule().strokeBorder(
+                LinearGradient(
+                    colors: [tone.topHighlight, tone.border],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 0.8
+            )
+        )
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        let font = BrandFont.body(10.5, weight: .medium)
+        if case .shimmer = indicator {
+            ShimmerText(text: text, font: font)
+        } else {
+            Text(text).font(font).foregroundStyle(.white)
+        }
+    }
+}
+
+/// prompt-kit's `typing` loader: three dots rising and fading in sequence.
+struct TypingLoader: View {
+    let color: Color
+    var dot: CGFloat = 4
+
+    @State private var phase = 0
+
+    var body: some View {
+        HStack(spacing: dot * 0.6) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(color)
+                    .frame(width: dot, height: dot)
+                    .opacity(phase == index ? 1 : 0.28)
+                    .offset(y: phase == index ? -dot * 0.35 : 0)
+            }
+        }
+        .task {
+            guard !RenderMode.isOffscreen else { return }
+            // A discrete cycle rather than three overlapping repeatForever
+            // animations, which drift out of step over a long-running panel.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(260))
+                withAnimation(.easeInOut(duration: 0.24)) { phase = (phase + 1) % 3 }
+            }
+        }
+    }
+}
+
+/// prompt-kit's `text-shimmer`: a highlight travelling across the glyphs.
+struct ShimmerText: View {
+    let text: String
+    let font: Font
+
+    private let period = 2.0
+
+    var body: some View {
+        if RenderMode.isOffscreen {
+            base.foregroundStyle(.white)
+        } else {
+            // Driven by TimelineView, not withAnimation: a gradient's
+            // startPoint/endPoint are not animatable properties, so the
+            // implicit-animation version silently rendered a static label.
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: period) / period
+                let travel = t * 2.4 - 0.7
+                base.foregroundStyle(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.4), location: 0),
+                            .init(color: .white, location: 0.5),
+                            .init(color: .white.opacity(0.4), location: 1),
+                        ],
+                        startPoint: UnitPoint(x: travel, y: 0.5),
+                        endPoint: UnitPoint(x: travel + 0.7, y: 0.5)
+                    )
+                )
+            }
+        }
+    }
+
+    private var base: some View {
+        Text(text).font(font)
+    }
+}
+
+/// The state dot: a solid bead with one concentric ring.
+///
+/// No blur and no specular highlight. A blurred halo bled past the pill it sits
+/// in and read as a glow around the pill itself, and a white speck on a 6pt
+/// circle just looks like a defect.
+struct StatusDot: View {
+    let color: Color
+    var size: CGFloat = 7
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .overlay(
+                Circle()
+                    .strokeBorder(color.opacity(0.30), lineWidth: size * 0.34)
+                    .frame(width: size * 1.9, height: size * 1.9)
+            )
+            .frame(width: size, height: size)
+    }
+}
+
+
+/// prompt-kit's `wave` loader: five bars rippling in a travelling sine.
+///
+/// Driven by TimelineView so every bar reads its height from one clock. Five
+/// independent repeating animations drift apart over the hours this panel
+/// stays open, which looks broken rather than alive.
+struct WaveLoader: View {
+    let color: Color
+    var animated = true
+    var barWidth: CGFloat = 1.6
+    var height: CGFloat = 11
+
+    private let bars = 5
+    private let period = 1.1
+
+    var body: some View {
+        if animated, !RenderMode.isOffscreen {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: period) / period
+                shape { index in
+                    let phase = t * 2 * .pi - Double(index) * 0.7
+                    return 0.35 + 0.65 * (sin(phase) + 1) / 2
+                }
+            }
+        } else {
+            // At rest the bars stay, flattened: the row still reads as the same
+            // component rather than swapping to a different mark.
+            shape { index in index == 2 ? 0.45 : 0.3 }
+        }
+    }
+
+    private func shape(_ scale: @escaping (Int) -> Double) -> some View {
+        HStack(alignment: .center, spacing: barWidth * 0.9) {
+            ForEach(0..<bars, id: \.self) { index in
+                Capsule()
+                    .fill(color)
+                    .frame(width: barWidth, height: height * scale(index))
+            }
+        }
+        .frame(width: CGFloat(bars) * barWidth * 1.9, height: height)
+    }
+}
+
+extension View {
+    /// Ties a glass shape to an identity so SwiftUI morphs it — the selected
+    /// tab pill flowing to its new position, the detail panel growing out of
+    /// the tile that opened it — instead of cross-fading two separate shapes.
+    @ViewBuilder
+    func glassMorph(id: String, in namespace: Namespace.ID) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            glassEffectID(id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// The selected tab, as a glass capsule rather than a painted one so it
+    /// picks up whatever is behind the panel.
+    @ViewBuilder
+    func glassTab(selected: Bool, morphID: String? = nil, in namespace: Namespace.ID? = nil) -> some View {
+        if selected {
+            if let namespace, let morphID {
+                glassCapsule(tint: .white.opacity(0.10)).glassMorph(id: morphID, in: namespace)
+            } else {
+                glassCapsule(tint: .white.opacity(0.10))
+            }
+        } else {
+            self
+        }
     }
 }

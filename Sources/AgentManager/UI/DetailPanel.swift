@@ -16,41 +16,65 @@ struct DetailPanel: View {
     let onClose: () -> Void
     let rows: AnyView
 
-    private let maxHeight: CGFloat = 420
+    private let maxHeight: CGFloat = 520
+    private let fade: CGFloat = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            // An explicit height, not a maximum: a ScrollView given only a
-            // maximum collapses to nothing inside MenuBarExtra's window.
+            // A real maximum now: the panel lives in an NSPopover, where a
+            // ScrollView measures its content properly. The old fixed height
+            // was an estimate per row, and rows that grew got sliced.
             if RenderMode.isOffscreen {
                 rows.padding(.horizontal, 11).padding(.bottom, 11)
             } else {
                 ScrollView {
-                    rows.padding(.horizontal, 11).padding(.bottom, 11)
+                    rows
+                        .padding(.horizontal, 11)
+                        // Room for the fade to eat into, so the first and last
+                        // rows are never cut mid-tile at rest.
+                        .padding(.vertical, fade)
                 }
-                .frame(height: min(CGFloat(count) * 74 + 16, maxHeight))
+                .frame(maxHeight: maxHeight)
+                .fixedSize(horizontal: false, vertical: true)
+                .mask(scrollFade)
+                .scrollIndicators(.never)
             }
         }
+    }
+
+    /// Content dissolves at both ends instead of being sliced off, so a list
+    /// longer than the panel reads as continuing rather than truncated.
+    private var scrollFade: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: 0.055),
+                .init(color: .black, location: 0.945),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private var header: some View {
         HStack(spacing: 7) {
             Text(title)
-                .font(BrandFont.body(12, weight: .semibold))
+                .font(BrandFont.body(13, weight: .bold))
                 .foregroundStyle(.white)
             Text(verbatim: "\(count)")
                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 5)
-                .frame(height: 15)
-                .background(Capsule().fill(Color.white.opacity(0.10)))
+                .padding(.horizontal, 6)
+                .frame(height: 16)
+                .glassCapsule(tint: .white.opacity(0.08))
 
             Spacer()
 
             if activeCount > 0 {
-                StatusPill(text: "\(activeCount) active", tone: .positive, showsDot: true)
+                StatusPill(text: "\(activeCount) active", tone: .positive, indicator: .typing)
                     .scaleEffect(0.9, anchor: .trailing)
             }
 
@@ -58,13 +82,13 @@ struct DetailPanel: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white.opacity(0.5))
-                    .frame(width: 18, height: 18)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .frame(width: 20, height: 20)
+                    .glassCapsule(tint: .white.opacity(0.06))
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 13)
-        .padding(.top, 12)
-        .padding(.bottom, 9)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
     }
 }

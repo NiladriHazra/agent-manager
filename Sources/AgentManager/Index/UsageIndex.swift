@@ -21,10 +21,11 @@ actor UsageIndex {
     }
 
     private struct Store: Codable {
-        var version = 3
+        var version = 4
         var files: [String: FileState] = [:]
         var buckets: [String: [String: Bucket]] = [:]
         var titles: [String: SessionMeta] = [:]
+        var chats: [String: ChatStats] = [:]
     }
 
     struct SessionMeta: Codable {
@@ -42,8 +43,11 @@ actor UsageIndex {
                 let output_tokens: Int?
                 let cache_creation_input_tokens: Int?
                 let cache_read_input_tokens: Int?
+                struct Details: Decodable { let thinking_tokens: Int? }
+                let output_tokens_details: Details?
             }
             let usage: Usage?
+            let model: String?
         }
         let timestamp: String?
         let message: Message?
@@ -93,7 +97,16 @@ actor UsageIndex {
     /// Most recent write across a session's transcripts, which is the signal
     /// for whether the agent is actually doing anything.
     static func lastWrite(in roots: [URL], matching sessionID: String? = nil) -> Date? {
-        var newest: Date?
+        newestTranscript(in: roots, matching: sessionID)?.written
+    }
+
+    /// The same scan, keeping the file itself: reading the last record is what
+    /// separates a session that is mid-turn from one waiting on a reply.
+    static func newestTranscript(
+        in roots: [URL],
+        matching sessionID: String? = nil
+    ) -> (url: URL, written: Date)? {
+        var best: (url: URL, written: Date)?
         for root in roots {
             guard let walker = FileManager.default.enumerator(
                 at: root,
@@ -105,10 +118,15 @@ actor UsageIndex {
                 if let sessionID, !url.path.contains(sessionID) { continue }
                 let stamp = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                     .contentModificationDate
-                if let stamp, stamp > (newest ?? .distantPast) { newest = stamp }
+                if let stamp, stamp > (best?.written ?? .distantPast) { best = (url, stamp) }
             }
         }
-        return newest
+        return best
+    }
+
+    func chat(id: String) -> ChatStats? {
+        load()
+        return store.chats[id]
     }
 
     func sessionMeta(id: String) -> SessionMeta? {
@@ -194,6 +212,25 @@ actor UsageIndex {
             bucket.cacheCreate += usage.cache_creation_input_tokens ?? 0
             bucket.cacheRead += usage.cache_read_input_tokens ?? 0
             store.buckets[agent.rawValue, default: [:]][hour] = bucket
+        }
+
+        if let session = record.sessionId, let usage = record.message?.usage, hasUsage {
+            var chat = store.chats[session] ?? ChatStats()
+            chat.input += usage.input_tokens ?? 0
+            chat.output += usage.output_tokens ?? 0
+            chat.cacheCreate += usage.cache_creation_input_tokens ?? 0
+            chat.cacheRead += usage.cache_read_input_tokens ?? 0
+            // What the model is currently holding: everything it was sent for
+            // this turn. The newest turn wins, and a compaction shows up as
+            // this number dropping.
+            let context = (usage.input_tokens ?? 0)
+                + (usage.cache_read_input_tokens ?? 0)
+                + (usage.cache_creation_input_tokens ?? 0)
+            if context > 0 { chat.contextTokens = context }
+            if let model = record.message?.model { chat.model = model }
+            if (usage.output_tokens ?? 0) > 0 { chat.turns += 1 }
+            chat.thinking += usage.output_tokens_details?.thinking_tokens ?? 0
+            store.chats[session] = chat
         }
 
         if let session = record.sessionId {

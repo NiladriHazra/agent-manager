@@ -39,16 +39,6 @@ enum AgentID: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// True only for marks that are plain white, which would vanish on a lit
-    /// chip and so get re-tinted dark. Marks carrying a brand colour, like
-    /// Claude's orange or Gemini's four-colour star, are left alone.
-    var markIsMonochrome: Bool {
-        switch self {
-        case .gemini, .claude: return false
-        default: return true
-        }
-    }
-
     /// argv[0] basenames that identify a real CLI process for this agent.
     var executableNames: [String] {
         switch self {
@@ -104,9 +94,20 @@ struct Usage: Equatable {
 /// activity is judged by how recently its transcript was written.
 enum Activity: Equatable {
     case working
+    /// Finished its turn and handed control back: it wants your reply before
+    /// anything else happens. Distinct from idle, which is nobody's turn.
+    case waiting(since: Date?)
     case idle(since: Date?)
 
     var isWorking: Bool { if case .working = self { return true }; return false }
+    var isWaiting: Bool { if case .waiting = self { return true }; return false }
+
+    var since: Date? {
+        switch self {
+        case .working: return nil
+        case .waiting(let date), .idle(let date): return date
+        }
+    }
 }
 
 struct RunningSession: Equatable, Identifiable {
@@ -120,6 +121,12 @@ struct RunningSession: Equatable, Identifiable {
     var title: String?
     var cwd: String?
     var branch: String?
+    var tty: String?
+    /// Whether an owning terminal app was found. A row that cannot be focused
+    /// must not offer a click that does nothing.
+    var canFocus = false
+    /// Per-chat totals and context pressure, when the agent records them.
+    var chat: ChatStats?
     var subAgents: [SubAgent] = []
 
     var id: Int32 { pid }
@@ -157,6 +164,7 @@ struct AgentSnapshot: Identifiable, Equatable {
     var id: String { agent.rawValue }
     var isRunning: Bool { !sessions.isEmpty }
     var workingSessions: [RunningSession] { sessions.filter { $0.activity.isWorking } }
+    var waitingSessions: [RunningSession] { sessions.filter { $0.activity.isWaiting } }
     var openSessions: [RunningSession] { sessions.filter { !$0.activity.isWorking } }
     var isWorking: Bool { !workingSessions.isEmpty }
 }

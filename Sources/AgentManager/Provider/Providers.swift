@@ -7,6 +7,30 @@ protocol AgentProvider {
 
 private let home = FileManager.default.homeDirectoryForCurrentUser
 
+/// The one provider list. Diagnostics used to keep its own copy, which meant a
+/// provider could be wired into the app and still report nothing when checked.
+func allProviders(index: UsageIndex) -> [AgentProvider] {
+    [
+        CodexProvider(),
+        ClaudeProvider(index: index),
+        OpenCodeProvider(),
+        GrokProvider(),
+        PresenceProvider(agent: .cursor, installedPaths: [
+            home.appendingPathComponent(".cursor").path,
+            "/Applications/Cursor.app",
+        ]),
+        PresenceProvider(agent: .gemini, installedPaths: [
+            home.appendingPathComponent(".gemini").path,
+        ]),
+        PresenceProvider(agent: .antigravity, installedPaths: [
+            home.appendingPathComponent("Library/Application Support/Antigravity").path,
+        ]),
+        PresenceProvider(agent: .hermes, installedPaths: [
+            home.appendingPathComponent(".hermes").path,
+        ]),
+    ]
+}
+
 /// A transcript written within this window means the agent is mid-task. Chosen
 /// from measurement: an active session writes every few seconds, while sessions
 /// parked at a prompt sat untouched for 17 to 58 minutes.
@@ -15,6 +39,19 @@ let workingWindow: TimeInterval = 180
 func activity(lastWrite: Date?) -> Activity {
     guard let lastWrite else { return .idle(since: nil) }
     return Date().timeIntervalSince(lastWrite) <= workingWindow ? .working : .idle(since: lastWrite)
+}
+
+/// Activity refined by what the transcript's last record actually says.
+///
+/// A session that wrote recently is not necessarily busy: finishing a turn is
+/// also a write. Only the transcript distinguishes the two.
+func activity(lastWrite: Date?, transcript: URL?, agent: AgentID) -> Activity {
+    guard let transcript,
+          TurnState.read(transcript: transcript, agent: agent) == .awaitingUser
+    else { return activity(lastWrite: lastWrite) }
+    // An ended turn is an ended turn whether it closed ten seconds or an hour
+    // ago: either way the next move is yours.
+    return .waiting(since: lastWrite)
 }
 
 // MARK: - Codex
@@ -78,10 +115,17 @@ struct CodexProvider: AgentProvider {
         // as fresh as the session that produced it.
         snapshot.quotaObserved = (try? newest.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate
-        let codexWrite = UsageIndex.lastWrite(in: [root])
+        snapshot.usage = TokenSources.codex(root: root, since: Date().addingTimeInterval(-7 * 86_400))
+        snapshot.usageToday = TokenSources.codex(root: root, since: Date().addingTimeInterval(-86_400))
+
+        let codexTranscript = UsageIndex.newestTranscript(in: [root])
         snapshot.sessions = sessions.map {
             var copy = $0
-            copy.activity = activity(lastWrite: codexWrite)
+            copy.activity = activity(
+                lastWrite: codexTranscript?.written,
+                transcript: codexTranscript?.url,
+                agent: agent
+            )
             return copy
         }
         if let credits = limits.credits, credits.unlimited != true, let balance = credits.balance {
@@ -150,11 +194,15 @@ struct ClaudeProvider: AgentProvider {
             } else {
                 session.title = nil
             }
+            let transcript = UsageIndex.newestTranscript(in: [root], matching: session.sessionID)
+                ?? UsageIndex.newestTranscript(in: [root])
             session.activity = activity(
-                lastWrite: UsageIndex.lastWrite(in: [root], matching: session.sessionID)
-                    ?? UsageIndex.lastWrite(in: [root])
+                lastWrite: transcript?.written,
+                transcript: transcript?.url,
+                agent: agent
             )
             if let id = session.sessionID {
+                session.chat = await index.chat(id: id)
                 session.subAgents = SessionDetail.subAgents(sessionID: id, root: root)
                 session.branch = SessionDetail.branch(sessionID: id, root: root) ?? session.branch
             }
@@ -170,6 +218,14 @@ struct ClaudeProvider: AgentProvider {
 /// read-only query covers the whole window. The database belongs to another
 /// process and is never written to.
 struct OpenCodeProvider: AgentProvider {
+    /// The model column holds a JSON blob, not a name.
+    private static func modelName(_ raw: String) -> String? {
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = object["id"] as? String else { return raw.isEmpty ? nil : raw }
+        return id
+    }
+
     let agent = AgentID.opencode
     private let dbPath = home.appendingPathComponent(".local/share/opencode/opencode.db").path
 
@@ -224,19 +280,69 @@ struct OpenCodeProvider: AgentProvider {
             copy.activity = activity(lastWrite: openCodeWrite)
             return copy
         }
-        if !sessions.isEmpty,
-           let title = SQLiteReader.queryRow(
-               path: dbPath,
-               sql: "SELECT title FROM session ORDER BY time_updated DESC LIMIT 1;"
-           )?.first {
-            snapshot.sessions = snapshot.sessions.map {
-                var copy = $0
-                copy.title = title
-                return copy
-            }
+        // Per-session detail, matched on the directory the process runs in.
+        // OpenCode records the model and price per session, which no other
+        // agent here does.
+        snapshot.sessions = snapshot.sessions.map { session in
+            var copy = session
+            let escaped = (session.cwd ?? "").replacingOccurrences(of: "'", with: "''")
+            guard let row = SQLiteReader.queryRow(
+                path: dbPath,
+                sql: """
+                SELECT title, model, cost, tokens_input, tokens_output, \
+                tokens_reasoning, tokens_cache_read, tokens_cache_write \
+                FROM session WHERE directory = '\(escaped)' \
+                ORDER BY time_updated DESC LIMIT 1;
+                """
+            ), row.count >= 8 else { return copy }
+
+            copy.title = row[0].isEmpty ? copy.title : row[0]
+            var chat = ChatStats()
+            chat.model = Self.modelName(row[1])
+            chat.cost = Double(row[2])
+            chat.input = Int(row[3]) ?? 0
+            chat.output = Int(row[4]) ?? 0
+            chat.thinking = Int(row[5]) ?? 0
+            chat.cacheRead = Int(row[6]) ?? 0
+            chat.cacheCreate = Int(row[7]) ?? 0
+            copy.chat = chat
+            return copy
         }
         snapshot.availability = .ready
         return snapshot
+    }
+}
+
+// MARK: - Grok
+
+/// Grok logs one `usage` block per turn, per working directory, and is the only
+/// agent besides OpenCode that records what a turn cost.
+struct GrokProvider: AgentProvider {
+    let agent = AgentID.grok
+    private let root = home.appendingPathComponent(".grok/sessions")
+
+    func probe(sessions: [RunningSession]) async -> AgentSnapshot {
+        var snapshot = AgentSnapshot(agent: agent, sessions: sessions)
+        guard FileManager.default.fileExists(atPath: root.path) else {
+            snapshot.availability = installedElsewhere || !sessions.isEmpty ? .ready : .notInstalled
+            return snapshot
+        }
+
+        snapshot.usage = TokenSources.grok(root: root, since: Date().addingTimeInterval(-7 * 86_400))
+        snapshot.usageToday = TokenSources.grok(root: root, since: Date().addingTimeInterval(-86_400))
+
+        let lastWrite = UsageIndex.lastWrite(in: [root])
+        snapshot.sessions = sessions.map {
+            var copy = $0
+            copy.activity = activity(lastWrite: lastWrite)
+            return copy
+        }
+        snapshot.availability = .ready
+        return snapshot
+    }
+
+    private var installedElsewhere: Bool {
+        FileManager.default.fileExists(atPath: home.appendingPathComponent(".grok").path)
     }
 }
 

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 enum MenuBarMode: String, CaseIterable, Identifiable {
     case countAndQuota
@@ -38,9 +39,18 @@ final class Preferences: ObservableObject {
     @Published var hideNotInstalled: Bool { didSet { defaults.set(hideNotInstalled, forKey: Key.hideNotInstalled) } }
     /// Off by default: the panel answers "what is working right now", so idle
     /// agents are noise unless you ask for them.
-    @Published var showIdleAgents: Bool { didSet { defaults.set(showIdleAgents, forKey: Key.showIdleAgents) } }
     @Published var hiddenAgents: Set<AgentID> {
         didSet { defaults.set(hiddenAgents.map(\.rawValue).sorted(), forKey: Key.hiddenAgents) }
+    }
+    /// Which readings a row is allowed to draw. Agents publish wildly different
+    /// data, so this is stored per agent rather than globally.
+    @Published var hiddenMetrics: [String: Set<String>] {
+        didSet {
+            defaults.set(
+                hiddenMetrics.mapValues { Array($0).sorted() },
+                forKey: Key.hiddenMetrics
+            )
+        }
     }
 
     private enum Key {
@@ -50,8 +60,8 @@ final class Preferences: ObservableObject {
         static let criticalThreshold = "criticalThreshold"
         static let includeCacheReads = "includeCacheReads"
         static let hideNotInstalled = "hideNotInstalled"
-        static let showIdleAgents = "showIdleAgents"
         static let hiddenAgents = "hiddenAgents"
+        static let hiddenMetrics = "hiddenMetrics"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -59,11 +69,12 @@ final class Preferences: ObservableObject {
         menuBarMode = (defaults.string(forKey: Key.menuBarMode)
             .flatMap(MenuBarMode.init(rawValue:))) ?? .countAndQuota
         refreshSeconds = defaults.object(forKey: Key.refreshSeconds) as? Int ?? 60
+        hiddenMetrics = (defaults.dictionary(forKey: Key.hiddenMetrics) as? [String: [String]] ?? [:])
+            .mapValues(Set.init)
         warnThreshold = defaults.object(forKey: Key.warnThreshold) as? Int ?? 20
         criticalThreshold = defaults.object(forKey: Key.criticalThreshold) as? Int ?? 10
         includeCacheReads = defaults.bool(forKey: Key.includeCacheReads)
         hideNotInstalled = defaults.object(forKey: Key.hideNotInstalled) as? Bool ?? true
-        showIdleAgents = defaults.bool(forKey: Key.showIdleAgents)
         hiddenAgents = Set(
             (defaults.stringArray(forKey: Key.hiddenAgents) ?? []).compactMap(AgentID.init(rawValue:))
         )
@@ -73,5 +84,28 @@ final class Preferences: ObservableObject {
 
     func setHidden(_ agent: AgentID, _ hidden: Bool) {
         if hidden { hiddenAgents.insert(agent) } else { hiddenAgents.remove(agent) }
+    }
+
+    /// Lives here rather than in a view body so it is testable and so
+    /// PreferencesCheck can exercise the same path the UI uses.
+    func visibilityBinding(for agent: AgentID) -> Binding<Bool> {
+        Binding(get: { !self.isHidden(agent) }, set: { self.setHidden(agent, !$0) })
+    }
+
+    func isEnabled(_ metric: Metric, for agent: AgentID) -> Bool {
+        !(hiddenMetrics[agent.rawValue]?.contains(metric.rawValue) ?? false)
+    }
+
+    func setEnabled(_ metric: Metric, for agent: AgentID, _ enabled: Bool) {
+        var set = hiddenMetrics[agent.rawValue] ?? []
+        if enabled { set.remove(metric.rawValue) } else { set.insert(metric.rawValue) }
+        hiddenMetrics[agent.rawValue] = set
+    }
+
+    func metricBinding(_ metric: Metric, for agent: AgentID) -> Binding<Bool> {
+        Binding(
+            get: { self.isEnabled(metric, for: agent) },
+            set: { self.setEnabled(metric, for: agent, $0) }
+        )
     }
 }

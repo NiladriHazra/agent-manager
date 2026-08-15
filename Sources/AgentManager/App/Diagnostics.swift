@@ -38,18 +38,7 @@ enum Diagnostics {
             print("           pid \(session.pid)  \(session.agent.rawValue)  cwd=\(session.cwd ?? "?")")
         }
 
-        let providers: [AgentProvider] = [
-            CodexProvider(),
-            ClaudeProvider(index: index),
-            OpenCodeProvider(),
-            PresenceProvider(agent: .cursor, installedPaths: [home.appendingPathComponent(".cursor").path]),
-            PresenceProvider(agent: .gemini, installedPaths: [home.appendingPathComponent(".gemini").path]),
-            PresenceProvider(agent: .antigravity, installedPaths: [
-                home.appendingPathComponent("Library/Application Support/Antigravity").path,
-            ]),
-            PresenceProvider(agent: .grok, installedPaths: [home.appendingPathComponent(".grok").path]),
-            PresenceProvider(agent: .hermes, installedPaths: [home.appendingPathComponent(".hermes").path]),
-        ]
+        let providers = allProviders(index: index)
 
         print("")
         for provider in providers {
@@ -61,10 +50,12 @@ enum Diagnostics {
                 if let observed = snapshot.quotaObserved {
                     line += "  [read \(QuotaBar.ago(observed))]"
                 }
-            } else if let usage = snapshot.usage {
+            }
+            if let usage = snapshot.usage {
+                if snapshot.quota != nil { line += "  " }
                 line += "usage out=\(usage.output) in=\(usage.input) cacheRead=\(usage.cacheRead)"
                 if let cost = usage.cost { line += String(format: " cost=$%.2f", cost) }
-            } else {
+            } else if snapshot.quota == nil {
                 line += "no numbers"
             }
             print(line)
@@ -72,9 +63,11 @@ enum Diagnostics {
                 let state: String
                 switch session.activity {
                 case .working: state = "WORKING"
+                case .waiting(let since): state = "WAITING " + (since.map { QuotaBar.ago($0) } ?? "")
                 case .idle(let since): state = "idle " + (since.map { QuotaBar.ago($0) } ?? "(unknown)")
                 }
-                print("            \u{21B3} \(pad(state, 16))\(session.activityLine)")
+                let focus = session.canFocus ? "focusable" : "no-terminal"
+                print("            \u{21B3} \(pad(state, 16))\(pad(session.activityLine, 34))\(pad(session.tty ?? "-", 14))\(focus)")
             }
         }
     }

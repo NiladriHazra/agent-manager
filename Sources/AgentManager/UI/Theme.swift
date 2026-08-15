@@ -15,39 +15,6 @@ enum Theme {
 
     /// `.klipeo-liquid-glass`: a faint diagonal sheen over near-black, with a
     /// one-pixel highlight along the top edge.
-    struct Glass: ViewModifier {
-        var cornerRadius: CGFloat = 12
-        var hovered = false
-
-        func body(content: Content) -> some View {
-            content
-                .background(
-                    ZStack {
-                        Color(hex: 0x0A0A0C).opacity(0.5)
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(hovered ? 0.07 : 0.04),
-                                Color.white.opacity(hovered ? 0.02 : 0.01),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.22), Color.white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        }
-    }
 
     /// StatusPill tones, matching the shared component's palette.
     enum Tone {
@@ -86,9 +53,6 @@ enum Theme {
 }
 
 extension View {
-    func glass(cornerRadius: CGFloat = 12, hovered: Bool = false) -> some View {
-        modifier(Theme.Glass(cornerRadius: cornerRadius, hovered: hovered))
-    }
 }
 
 extension Color {

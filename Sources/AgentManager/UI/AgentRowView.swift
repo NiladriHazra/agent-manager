@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// The vendor's own mark. AppKit rasterizes the bundled SVGs directly. Marks
-/// are inverted on a lit chip so a white logo stays legible on white.
+/// The vendor's own mark. AppKit rasterizes the bundled SVGs directly.
+///
+/// There is no inverted variant: the well behind it is always the same dark
+/// disc, so a mark that changed with state was the bug, not a feature.
 struct AgentLogo: View {
     let agent: AgentID
-    var inverted = false
 
     var body: some View {
         Group {
@@ -12,25 +13,34 @@ struct AgentLogo: View {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
-                    .colorMultiply(inverted && agent.markIsMonochrome ? Color(hex: 0x1A1A1C) : .white)
+                    .colorMultiply(.white)
             } else {
                 Text(String(agent.displayName.prefix(1)))
                     .font(BrandFont.body(12, weight: .semibold))
-                    .foregroundStyle(inverted ? Color(hex: 0x1A1A1C) : .white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
     }
 
+    /// Cached: `body` runs for every row on every refresh, and an uncached
+    /// version re-read and re-rasterized the SVG from disk each time.
+    @MainActor private static var cache: [String: NSImage] = [:]
+
+    @MainActor
     private static func load(_ name: String) -> NSImage? {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg") else { return nil }
-        let image = NSImage(contentsOf: url)
-        image?.size = NSSize(width: 38, height: 38)
+        if let cached = cache[name] { return cached }
+        // Most marks are SVG; Hermes ships only as a bitmap.
+        let url = Bundle.module.url(forResource: name, withExtension: "svg")
+            ?? Bundle.module.url(forResource: name, withExtension: "png")
+        guard let url, let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 38, height: 38)
+        cache[name] = image
         return image
     }
 }
 
-/// A Control Center slider: a tall rounded track with a filled portion.
-struct QuotaBar: View {
+/// The text under the split bar: used, left, window, and when it resets.
+struct QuotaLine: View {
     let quota: Quota
     var observed: Date?
     let warn: Int
@@ -51,38 +61,21 @@ struct QuotaBar: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.13))
-                    Capsule()
-                        .fill(LinearGradient(
-                            colors: tone == .quota
-                                ? [Theme.accentLight, Theme.accent]
-                                : [tone.text, tone.text.opacity(0.75)],
-                            startPoint: .leading, endPoint: .trailing
-                        ))
-                        .frame(width: max(6, geo.size.width * quota.usedPercent / 100))
-                }
+        HStack(spacing: 4) {
+            Text("\(Int(quota.usedPercent))% used").foregroundStyle(.white.opacity(0.85))
+            Text("·").foregroundStyle(.white.opacity(0.3))
+            Text("\(Int(quota.remainingPercent))% left").foregroundStyle(tone.text)
+            Text("·").foregroundStyle(.white.opacity(0.3))
+            Text(quota.windowLabel).foregroundStyle(.white.opacity(0.4))
+            Spacer()
+            if let staleLabel {
+                Text(staleLabel).foregroundStyle(.white.opacity(0.3))
+            } else {
+                Text("resets \(Self.countdown(to: quota.resetsAt))")
+                    .foregroundStyle(.white.opacity(0.4))
             }
-            .frame(height: 5)
-
-            HStack(spacing: 4) {
-                Text("\(Int(quota.usedPercent))% used").foregroundStyle(.white.opacity(0.85))
-                Text("·").foregroundStyle(.white.opacity(0.3))
-                Text("\(Int(quota.remainingPercent))% left").foregroundStyle(tone.text)
-                Text("·").foregroundStyle(.white.opacity(0.3))
-                Text(quota.windowLabel).foregroundStyle(.white.opacity(0.4))
-                Spacer()
-                if let staleLabel {
-                    Text(staleLabel).foregroundStyle(.white.opacity(0.3))
-                } else {
-                    Text("resets \(Self.countdown(to: quota.resetsAt))")
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-            .font(BrandFont.body(10))
         }
+        .font(BrandFont.body(10))
     }
 
     static func countdown(to date: Date) -> String {
@@ -106,3 +99,6 @@ struct QuotaBar: View {
         return "\(hours / 24)d ago"
     }
 }
+
+/// The old name, kept because `ago` and `countdown` are used all over.
+typealias QuotaBar = QuotaLine

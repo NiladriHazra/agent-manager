@@ -2,10 +2,18 @@ import SwiftUI
 
 enum PanelTab: String, CaseIterable, Identifiable {
     case working
+    case waiting
     case open
 
     var id: String { rawValue }
-    var label: String { self == .working ? "Working" : "Open" }
+
+    var label: String {
+        switch self {
+        case .working: return "Working"
+        case .waiting: return "Waiting"
+        case .open: return "Open"
+        }
+    }
 }
 
 struct MenuContentView: View {
@@ -13,16 +21,35 @@ struct MenuContentView: View {
     @State private var tab: PanelTab = .working
     @State private var detail: DetailTarget?
     @State private var primed = false
+    @Namespace private var glass
 
     var body: some View {
-        HStack(spacing: 0) {
+        // Top-aligned: the side panel is shorter than the list, and an HStack
+        // centres by default, which read as a huge gap above it.
+        panel.glassGroup(spacing: 14)
+    }
+
+    /// Everything inside one glass container, so shapes can flow between the
+    /// list and the detail column instead of cross-fading.
+    private var panel: some View {
+        HStack(alignment: .top, spacing: 0) {
             main
             if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))
-                sidePanel.frame(width: 288)
+                sidePanel
+                    .frame(width: 300, alignment: .top)
+                    .glassMorph(id: "detail", in: glass)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.92, anchor: .leading).combined(with: .opacity),
+                        removal: .scale(scale: 0.94, anchor: .leading).combined(with: .opacity)
+                    ))
             }
         }
-        .background(RenderMode.isOffscreen ? AnyView(Theme.surface) : AnyView(Color.clear))
+        // Apple's own spring, so the side panel grows out of the tile the
+        // way system glass surfaces do rather than sliding in flat.
+        .animation(.smooth(duration: 0.34, extraBounce: 0.08), value: detail)
+        .animation(.smooth(duration: 0.24), value: tab)
+        .background(RenderMode.isOffscreen ? Theme.surface : Color.clear)
         .onAppear {
             model.menuOpened()
             // Offscreen renders open the side panel so it can be inspected.
@@ -43,12 +70,13 @@ struct MenuContentView: View {
                     emptyState
                 } else {
                     ForEach(groups, id: \.agent) { group in
-                        AgentGroupView(group: group, inspecting: .constant(nil), detail: $detail)
+                        AgentGroupView(group: group, detail: $detail, glass: glass)
+                            .glassMorph(id: "agent-\(group.agent.rawValue)", in: glass)
                     }
                 }
             }
             .padding(.horizontal, 11)
-            .padding(.bottom, 11)
+            .padding(.bottom, 9)
             .glassGroup()
         }
         .frame(width: 332)
@@ -58,7 +86,12 @@ struct MenuContentView: View {
     /// Codex quota is stated once rather than repeated on all four terminals.
     private var groups: [AgentGroup] {
         model.visibleSnapshots.compactMap { snapshot in
-            let sessions = tab == .working ? snapshot.workingSessions : snapshot.openSessions
+            let sessions: [RunningSession]
+            switch tab {
+            case .working: sessions = snapshot.workingSessions
+            case .waiting: sessions = snapshot.waitingSessions
+            case .open: sessions = snapshot.openSessions
+            }
             guard !sessions.isEmpty else { return nil }
             return AgentGroup(
                 agent: snapshot.agent,
@@ -125,16 +158,16 @@ struct MenuContentView: View {
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 9)
+        .padding(.bottom, 6)
     }
 
     private var tabs: some View {
         HStack(spacing: 5) {
             Spacer()
             ForEach(PanelTab.allCases) { option in
-                let count = option == .working ? model.workingCount : model.openCount
-                Button { tab = option; detail = nil } label: {
+                let count = model.count(for: option)
+                Button { withAnimation(.smooth(duration: 0.24)) { tab = option; detail = nil } } label: {
                     HStack(spacing: 6) {
                         Text(option.label).font(BrandFont.body(11, weight: .semibold))
                         Text(verbatim: "\(count)")
@@ -144,13 +177,7 @@ struct MenuContentView: View {
                     .foregroundStyle(tab == option ? .white : .white.opacity(0.5))
                     .padding(.horizontal, 11)
                     .frame(height: 24)
-                    .background {
-                        if tab == option {
-                            Capsule().fill(.ultraThinMaterial)
-                                .overlay(Capsule().fill(Color.white.opacity(0.13)))
-                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7))
-                        }
-                    }
+                    .glassTab(selected: tab == option, morphID: "tab", in: glass)
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -158,12 +185,20 @@ struct MenuContentView: View {
             Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 9)
+        .padding(.bottom, 7)
+    }
+
+    private var emptyMessage: String {
+        switch tab {
+        case .working: return "Nothing working right now"
+        case .waiting: return "No one is waiting on you"
+        case .open: return "No idle sessions"
+        }
     }
 
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Text(tab == .working ? "Nothing working right now" : "No idle sessions")
+            Text(emptyMessage)
                 .font(BrandFont.body(12.5, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.6))
             if tab == .working, model.openCount > 0 {

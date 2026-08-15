@@ -9,38 +9,18 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var snapshots: [AgentSnapshot] = []
-    @Published private(set) var lastUpdated: Date?
-    @Published private(set) var isRefreshing = false
+    // Neither is observed by a view. Publishing them invalidated the whole
+    // panel three times per refresh, defeating the snapshot diffing below.
+    private(set) var lastUpdated: Date?
+    private var isRefreshing = false
 
     private let index = UsageIndex()
     private var providers: [AgentProvider] = []
     private var timer: Timer?
     private var menuIsOpen = false
 
-    private let home = FileManager.default.homeDirectoryForCurrentUser
-
     init() {
-        providers = [
-            CodexProvider(),
-            ClaudeProvider(index: index),
-            OpenCodeProvider(),
-            PresenceProvider(agent: .cursor, installedPaths: [
-                home.appendingPathComponent(".cursor").path,
-                "/Applications/Cursor.app",
-            ]),
-            PresenceProvider(agent: .gemini, installedPaths: [
-                home.appendingPathComponent(".gemini").path,
-            ]),
-            PresenceProvider(agent: .antigravity, installedPaths: [
-                home.appendingPathComponent("Library/Application Support/Antigravity").path,
-            ]),
-            PresenceProvider(agent: .grok, installedPaths: [
-                home.appendingPathComponent(".grok").path,
-            ]),
-            PresenceProvider(agent: .hermes, installedPaths: [
-                home.appendingPathComponent(".hermes").path,
-            ]),
-        ]
+        providers = allProviders(index: index)
         snapshots = providers.map { AgentSnapshot(agent: $0.agent) }
         startTimer()
     }
@@ -64,6 +44,19 @@ final class AppModel: ObservableObject {
         snapshots.reduce(0) { $0 + $1.sessions.count }
     }
 
+    /// Sessions that finished a turn and are holding for your reply.
+    var waitingCount: Int {
+        snapshots.reduce(0) { $0 + $1.waitingSessions.count }
+    }
+
+    func count(for tab: PanelTab) -> Int {
+        switch tab {
+        case .working: return workingCount
+        case .waiting: return waitingCount
+        case .open: return openCount
+        }
+    }
+
     var visibleSnapshots: [AgentSnapshot] {
         let prefs = Preferences.shared
         return snapshots.filter { snapshot in
@@ -83,7 +76,7 @@ final class AppModel: ObservableObject {
 
     func menuClosed() {
         menuIsOpen = false
-        startTimer()
+        startTimer(refreshNow: false)
     }
 
     func refresh() {
@@ -107,7 +100,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func startTimer() {
+    private func startTimer(refreshNow: Bool = true) {
         timer?.invalidate()
         // An open panel is being read right now, so it refreshes far more
         // often; a closed one only needs to keep the menu bar roughly current.
@@ -115,7 +108,7 @@ final class AppModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
-        refresh()
+        if refreshNow { refresh() }
     }
 
     func restartTimer() { startTimer() }

@@ -16,13 +16,16 @@ enum ProcessScanner {
         /// from a version-named binary, so its p_comm reads "2.1.233".
         let executable: String
         let argv: [String]
+        /// Controlling terminal, e.g. `/dev/ttys008`. This is how a terminal
+        /// app is asked to select the right tab.
+        var tty: String?
         var name: String { (executable as NSString).lastPathComponent }
     }
 
     /// Helper binaries and wrappers that mention an agent but are not one.
     private static let rejectedArgFragments = [
         "--type=", "app-server", "code-mode-host", "mcp-server", "--listen",
-        "remote-control", "crashpad", "ComputerUse",
+        "remote-control", "crashpad", "ComputerUse", "gateway run", "-m hermes_cli",
     ]
 
     private static let shellNames: Set<String> = [
@@ -32,6 +35,11 @@ enum ProcessScanner {
     static func runningAgents() -> [RunningSession] {
         let procs = allProcesses()
         let byPid = Dictionary(uniqueKeysWithValues: procs.map { ($0.pid, $0) })
+        // The walk to an owning terminal crosses shells and app bundles, which
+        // the agent filter drops, so it needs the full table.
+        let everything = Dictionary(
+            uniqueKeysWithValues: allProcessesUnfiltered().map { ($0.pid, $0) }
+        )
 
         var matches: [(Proc, AgentID)] = []
         for proc in procs {
@@ -64,17 +72,27 @@ enum ProcessScanner {
                 sessionID: resumedSessionID(proc.argv),
                 title: nil,
                 cwd: cwd(of: proc.pid),
-                branch: nil
+                branch: nil,
+                tty: proc.tty,
+                canFocus: TerminalFocus.canFocus(pid: proc.pid, in: everything)
             )
         }
     }
 
+    /// Names a process might be known by. A wrapper script keeps the tool in
+    /// argv[0], and an interpreter launch (`python3 .../bin/hermes`) puts it in
+    /// argv[1], so all of them are considered.
+    static func candidateNames(_ execPath: String, _ argv: [String]) -> [String] {
+        var names = [(execPath as NSString).lastPathComponent]
+        for arg in argv.prefix(2) where !arg.hasPrefix("-") {
+            names.append((arg as NSString).lastPathComponent)
+        }
+        return names
+    }
+
     static func classify(_ proc: Proc) -> AgentID? {
         let exec = proc.executable
-        let names = [
-            proc.name,
-            proc.argv.first.map { ($0 as NSString).lastPathComponent } ?? "",
-        ]
+        let names = candidateNames(exec, proc.argv)
         // Only a bare interpreter with no agent name anywhere is a shell.
         guard names.contains(where: { !shellNames.contains($0) }) else { return nil }
         // Anything shipped inside an .app bundle is a GUI helper, not the CLI.
@@ -86,6 +104,45 @@ enum ProcessScanner {
         return AgentID.allCases.first { agent in
             names.contains { agent.executableNames.contains($0) }
         }
+    }
+
+    private static func ttyName(_ device: dev_t) -> String? {
+        guard device != dev_t.max else { return nil }
+        guard let name = devname(device, S_IFCHR) else { return nil }
+        return "/dev/" + String(cString: name)
+    }
+
+    /// Every process this user owns, with no agent filtering. Walking up to a
+    /// terminal crosses shells and app bundles, which the agent filter drops.
+    static func allProcessesUnfiltered() -> [Proc] {
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var length = 0
+        guard sysctl(&name, 4, nil, &length, nil, 0) == 0, length > 0 else { return [] }
+
+        let count = length / MemoryLayout<kinfo_proc>.stride
+        var buffer = [kinfo_proc](repeating: kinfo_proc(), count: count)
+        guard sysctl(&name, 4, &buffer, &length, nil, 0) == 0 else { return [] }
+
+        let uid = getuid()
+        return (0..<(length / MemoryLayout<kinfo_proc>.stride)).compactMap { index in
+            let entry = buffer[index]
+            guard entry.kp_eproc.e_ucred.cr_uid == uid, entry.kp_proc.p_pid > 0 else { return nil }
+            return Proc(
+                pid: entry.kp_proc.p_pid,
+                ppid: entry.kp_eproc.e_ppid,
+                executable: executablePath(of: entry.kp_proc.p_pid) ?? "",
+                argv: [],
+                tty: nil
+            )
+        }
+    }
+
+    /// Cheap exec-path lookup for a single pid.
+    static func executablePath(of pid: Int32) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        let size = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard size > 0 else { return nil }
+        return String(cString: buffer)
     }
 
     /// Working directory of a pid. Same-user processes need no entitlement.
@@ -141,14 +198,13 @@ enum ProcessScanner {
 
             // A wrapper script keeps the tool's name in argv[0] even though the
             // kernel reports the interpreter it exec'd.
-            let execName = (execPath as NSString).lastPathComponent
-            let argvName = argv.first.map { ($0 as NSString).lastPathComponent } ?? ""
-            guard wanted.contains(execName) || wanted.contains(argvName) else { continue }
+            guard wanted.contains(where: { candidateNames(execPath, argv).contains($0) }) else { continue }
             result.append(Proc(
                 pid: entry.kp_proc.p_pid,
                 ppid: entry.kp_eproc.e_ppid,
                 executable: execPath,
-                argv: argv
+                argv: argv,
+                tty: ttyName(entry.kp_eproc.e_tdev)
             ))
         }
         return result
