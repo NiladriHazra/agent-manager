@@ -34,7 +34,7 @@ struct SessionRowView: View {
                 }
 
                 Spacer(minLength: 8)
-                StatusPill(text: state.text, tone: state.tone, showsDot: state.dot, pulses: working)
+                StatusPill(text: state.text, tone: state.tone, showsDot: state.dot)
             }
 
             metadata
@@ -154,45 +154,52 @@ private struct Chip: View {
 }
 
 /// A subagent: its task, its branch, and whether it is still going.
+///
+/// These are the smallest rows in the app, so they carry only what separates
+/// one from another: the task, where it is running, and how long ago it last
+/// wrote. Everything else would be noise at this size.
 struct SubAgentRow: View {
     let subAgent: SubAgent
+    @State private var hovered = false
 
     var body: some View {
-        HStack(spacing: 9) {
-            Circle()
-                .fill(subAgent.isWorking ? StatusPill.Tone.positive.dot : Color.white.opacity(0.2))
-                .frame(width: 5, height: 5)
-                .shadow(color: subAgent.isWorking ? StatusPill.Tone.positive.dot.opacity(0.8) : .clear, radius: 3)
+        HStack(alignment: .top, spacing: 10) {
+            StatusDot(
+                color: subAgent.isWorking ? StatusPill.Tone.positive.dot : .white.opacity(0.28),
+                size: 6
+            )
+            .padding(.top, 3)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(subAgent.label)
-                    .font(BrandFont.body(11))
-                    .foregroundStyle(.white.opacity(subAgent.isWorking ? 0.9 : 0.55))
-                    .lineLimit(1)
-                if let branch = subAgent.branch {
-                    Text(branch)
+                    .font(BrandFont.body(11.5, weight: subAgent.isWorking ? .semibold : .regular))
+                    .foregroundStyle(.white.opacity(subAgent.isWorking ? 1 : 0.62))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    if let branch = subAgent.branch {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.triangle.branch").font(.system(size: 7.5))
+                            Text(branch)
+                                .font(.system(size: 9, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .foregroundStyle(.white.opacity(0.42))
+                    }
+                    Spacer(minLength: 4)
+                    Text(subAgent.lastWrite.map { QuotaBar.ago($0) } ?? "")
                         .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.3))
-                        .lineLimit(1)
+                        .foregroundStyle(.white.opacity(subAgent.isWorking ? 0.6 : 0.3))
                 }
             }
-
-            Spacer(minLength: 6)
-
-            Text(subAgent.lastWrite.map { QuotaBar.ago($0) } ?? "")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.3))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.07), lineWidth: 0.6)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .glassTile(radius: 14, highlighted: hovered || subAgent.isWorking)
+        .onHover { hovered = $0 }
     }
 }
 
@@ -201,6 +208,10 @@ struct SubAgentRow: View {
 struct IconWell: View {
     let agent: AgentID
     var lit: Bool
+    /// The chrome rim belongs to the disc in front. Repeating it on the discs
+    /// behind a stack turns three clean edges into one smeared one.
+    var bezel = true
+    var size: CGFloat = 30
 
     var body: some View {
         // The mark goes in an overlay, not behind: Liquid Glass composites
@@ -210,7 +221,7 @@ struct IconWell: View {
             .overlay {
                 // Brushed-chrome bezel: a bright arc where the light lands, a
                 // dark one opposite, and a faint spectral split between them.
-                Circle().strokeBorder(
+                bezel ? AnyView(Circle().strokeBorder(
                     AngularGradient(
                         colors: [
                             .white.opacity(lit ? 0.9 : 0.5),
@@ -224,11 +235,12 @@ struct IconWell: View {
                         angle: .degrees(-58)
                     ),
                     lineWidth: 1.1
-                )
+                )) : AnyView(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 0.8))
             }
             .overlay {
-                AgentLogo(agent: agent, inverted: lit).frame(width: 16, height: 16)
+                AgentLogo(agent: agent, inverted: lit)
+                    .frame(width: size * 0.53, height: size * 0.53)
             }
-            .frame(width: 30, height: 30)
+            .frame(width: size, height: size)
     }
 }

@@ -123,18 +123,21 @@ struct StackedIcons: View {
     let count: Int
     let lit: Bool
 
+    private var depth: Int { min(count, 3) }
+
     var body: some View {
         ZStack(alignment: .leading) {
-            // The discs behind carry the same mark, so a stack reads as several
-            // of the same tool rather than one logo sitting on blank coins.
-            ForEach(1..<max(min(count, 3), 1), id: \.self) { index in
-                IconWell(agent: agent, lit: false)
-                    .offset(x: CGFloat(index) * 5)
-                    .opacity(0.45)
+            // The discs behind carry the same mark, smaller and dimmer, with no
+            // chrome rim of their own so the stack reads as depth rather than
+            // three logos fighting for the same 30 points.
+            ForEach(1..<max(depth, 1), id: \.self) { index in
+                IconWell(agent: agent, lit: false, bezel: false, size: 30 - CGFloat(index) * 3)
+                    .opacity(0.5 - Double(index) * 0.14)
+                    .offset(x: CGFloat(index) * 7)
             }
             IconWell(agent: agent, lit: lit)
         }
-        .frame(width: 30 + CGFloat(min(count, 3) - 1) * 5, alignment: .leading)
+        .frame(width: 30 + CGFloat(depth - 1) * 7, alignment: .leading)
     }
 }
 

@@ -30,7 +30,7 @@ struct DetailPanel: View {
                 ScrollView {
                     rows.padding(.horizontal, 11).padding(.bottom, 11)
                 }
-                .frame(height: min(CGFloat(count) * 74 + 16, maxHeight))
+                .frame(height: min(CGFloat(count) * 78 + 16, maxHeight))
             }
         }
     }
@@ -38,14 +38,14 @@ struct DetailPanel: View {
     private var header: some View {
         HStack(spacing: 7) {
             Text(title)
-                .font(BrandFont.body(12, weight: .semibold))
+                .font(BrandFont.body(13, weight: .bold))
                 .foregroundStyle(.white)
             Text(verbatim: "\(count)")
                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 5)
-                .frame(height: 15)
-                .background(Capsule().fill(Color.white.opacity(0.10)))
+                .padding(.horizontal, 6)
+                .frame(height: 16)
+                .glassCapsule(tint: .white.opacity(0.08))
 
             Spacer()
 
@@ -58,8 +58,8 @@ struct DetailPanel: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white.opacity(0.5))
-                    .frame(width: 18, height: 18)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .frame(width: 20, height: 20)
+                    .glassCapsule(tint: .white.opacity(0.06))
             }
             .buttonStyle(.plain)
         }

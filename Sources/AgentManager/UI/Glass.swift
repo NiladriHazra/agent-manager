@@ -153,13 +153,11 @@ struct StatusPill: View {
     let text: String
     let tone: Tone
     var showsDot = false
-    /// Breathing halo, for a state that is genuinely still moving.
-    var pulses = false
 
     var body: some View {
         HStack(spacing: 5) {
             if showsDot {
-                StatusDot(color: tone.dot, pulses: pulses)
+                StatusDot(color: tone.dot)
             }
             Text(text)
                 .font(BrandFont.body(10.5, weight: .medium))
@@ -180,10 +178,7 @@ struct StatusPill: View {
 /// rather than a printed dot.
 struct StatusDot: View {
     let color: Color
-    var pulses = false
     var size: CGFloat = 7
-
-    @State private var breathing = false
 
     var body: some View {
         ZStack {
@@ -191,8 +186,6 @@ struct StatusDot: View {
                 .fill(color.opacity(0.32))
                 .frame(width: size * 2.3, height: size * 2.3)
                 .blur(radius: size * 0.55)
-                .scaleEffect(breathing ? 1.18 : 0.86)
-                .opacity(breathing ? 1 : 0.55)
 
             Circle()
                 .fill(
@@ -215,12 +208,6 @@ struct StatusDot: View {
                 .shadow(color: color.opacity(0.7), radius: size * 0.5)
         }
         .frame(width: size, height: size)
-        .onAppear {
-            guard pulses, !RenderMode.isOffscreen else { return }
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
-                breathing = true
-            }
-        }
     }
 }
 
