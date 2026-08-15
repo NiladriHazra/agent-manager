@@ -2,10 +2,18 @@ import SwiftUI
 
 enum PanelTab: String, CaseIterable, Identifiable {
     case working
+    case waiting
     case open
 
     var id: String { rawValue }
-    var label: String { self == .working ? "Working" : "Open" }
+
+    var label: String {
+        switch self {
+        case .working: return "Working"
+        case .waiting: return "Waiting"
+        case .open: return "Open"
+        }
+    }
 }
 
 struct MenuContentView: View {
@@ -19,9 +27,12 @@ struct MenuContentView: View {
             main
             if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))
-                sidePanel.frame(width: 288)
+                sidePanel
+                    .frame(width: 300)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
+        .animation(.smooth(duration: 0.28), value: detail)
         .background(RenderMode.isOffscreen ? AnyView(Theme.surface) : AnyView(Color.clear))
         .onAppear {
             model.menuOpened()
@@ -58,7 +69,12 @@ struct MenuContentView: View {
     /// Codex quota is stated once rather than repeated on all four terminals.
     private var groups: [AgentGroup] {
         model.visibleSnapshots.compactMap { snapshot in
-            let sessions = tab == .working ? snapshot.workingSessions : snapshot.openSessions
+            let sessions: [RunningSession]
+            switch tab {
+            case .working: sessions = snapshot.workingSessions
+            case .waiting: sessions = snapshot.waitingSessions
+            case .open: sessions = snapshot.openSessions
+            }
             guard !sessions.isEmpty else { return nil }
             return AgentGroup(
                 agent: snapshot.agent,
@@ -133,7 +149,7 @@ struct MenuContentView: View {
         HStack(spacing: 5) {
             Spacer()
             ForEach(PanelTab.allCases) { option in
-                let count = option == .working ? model.workingCount : model.openCount
+                let count = model.count(for: option)
                 Button { tab = option; detail = nil } label: {
                     HStack(spacing: 6) {
                         Text(option.label).font(BrandFont.body(11, weight: .semibold))
@@ -144,13 +160,7 @@ struct MenuContentView: View {
                     .foregroundStyle(tab == option ? .white : .white.opacity(0.5))
                     .padding(.horizontal, 11)
                     .frame(height: 24)
-                    .background {
-                        if tab == option {
-                            Capsule().fill(.ultraThinMaterial)
-                                .overlay(Capsule().fill(Color.white.opacity(0.13)))
-                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7))
-                        }
-                    }
+                    .glassTab(selected: tab == option)
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -161,9 +171,17 @@ struct MenuContentView: View {
         .padding(.bottom, 9)
     }
 
+    private var emptyMessage: String {
+        switch tab {
+        case .working: return "Nothing working right now"
+        case .waiting: return "No one is waiting on you"
+        case .open: return "No idle sessions"
+        }
+    }
+
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Text(tab == .working ? "Nothing working right now" : "No idle sessions")
+            Text(emptyMessage)
                 .font(BrandFont.body(12.5, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.6))
             if tab == .working, model.openCount > 0 {

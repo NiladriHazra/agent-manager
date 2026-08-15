@@ -8,8 +8,26 @@ import SwiftUI
 struct GlassTile: ViewModifier {
     var radius: CGFloat = 20
     var highlighted = false
+    /// Tiles that respond to a click ask for the material's own pointer
+    /// reaction rather than a hand-rolled hover fill.
+    var interactive = true
 
     func body(content: Content) -> some View {
+        if #available(macOS 26.0, *), !RenderMode.isOffscreen {
+            content.glassEffect(
+                interactive
+                    ? .regular.tint(.white.opacity(highlighted ? 0.10 : 0.03)).interactive()
+                    : .regular.tint(.white.opacity(highlighted ? 0.10 : 0.03)),
+                in: .rect(cornerRadius: radius)
+            )
+        } else {
+            legacy(content)
+        }
+    }
+
+    /// Pre-26 fallback: material plus a hand-painted rim, which is the closest
+    /// approximation available without the real material.
+    private func legacy(_ content: Content) -> some View {
         content
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
@@ -47,8 +65,8 @@ struct GlassTile: ViewModifier {
 }
 
 extension View {
-    func glassTile(radius: CGFloat = 20, highlighted: Bool = false) -> some View {
-        modifier(GlassTile(radius: radius, highlighted: highlighted))
+    func glassTile(radius: CGFloat = 20, highlighted: Bool = false, interactive: Bool = true) -> some View {
+        modifier(GlassTile(radius: radius, highlighted: highlighted, interactive: interactive))
     }
 
     /// Real glass for a capsule, so pills and chips get the same treatment as
@@ -135,11 +153,13 @@ struct StatusPill: View {
     let text: String
     let tone: Tone
     var showsDot = false
+    /// Breathing halo, for a state that is genuinely still moving.
+    var pulses = false
 
     var body: some View {
         HStack(spacing: 5) {
             if showsDot {
-                Circle().fill(tone.dot).frame(width: 5, height: 5)
+                StatusDot(color: tone.dot, pulses: pulses)
             }
             Text(text)
                 .font(BrandFont.body(10.5, weight: .medium))
@@ -149,5 +169,71 @@ struct StatusPill: View {
         .frame(height: 21)
         .glassCapsule(tint: tone.fill)
         .overlay(Capsule().strokeBorder(tone.border, lineWidth: 0.8))
+    }
+}
+
+/// The state dot.
+///
+/// A flat filled circle reads as a debug marker. Depth is what makes it look
+/// deliberate: a diffuse halo the colour bleeds into, a saturated core, and a
+/// specular highlight offset toward the top left so it reads as a lit bead
+/// rather than a printed dot.
+struct StatusDot: View {
+    let color: Color
+    var pulses = false
+    var size: CGFloat = 7
+
+    @State private var breathing = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.32))
+                .frame(width: size * 2.3, height: size * 2.3)
+                .blur(radius: size * 0.55)
+                .scaleEffect(breathing ? 1.18 : 0.86)
+                .opacity(breathing ? 1 : 0.55)
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [color.opacity(0.95), color],
+                        center: UnitPoint(x: 0.32, y: 0.28),
+                        startRadius: 0,
+                        endRadius: size
+                    )
+                )
+                .overlay(Circle().strokeBorder(.white.opacity(0.28), lineWidth: 0.5))
+                .overlay(alignment: .topLeading) {
+                    Circle()
+                        .fill(.white.opacity(0.75))
+                        .frame(width: size * 0.3, height: size * 0.3)
+                        .blur(radius: 0.4)
+                        .offset(x: size * 0.2, y: size * 0.16)
+                }
+                .frame(width: size, height: size)
+                .shadow(color: color.opacity(0.7), radius: size * 0.5)
+        }
+        .frame(width: size, height: size)
+        .onAppear {
+            guard pulses, !RenderMode.isOffscreen else { return }
+            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+        }
+    }
+}
+
+extension View {
+    /// The selected tab, as a glass capsule rather than a painted one so it
+    /// picks up whatever is behind the panel.
+    @ViewBuilder
+    func glassTab(selected: Bool) -> some View {
+        if selected {
+            glassCapsule(tint: .white.opacity(0.10))
+                .overlay(Capsule().strokeBorder(.white.opacity(0.20), lineWidth: 0.7))
+        } else {
+            self
+        }
     }
 }

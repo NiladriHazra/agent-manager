@@ -44,6 +44,19 @@ final class AppModel: ObservableObject {
         snapshots.reduce(0) { $0 + $1.sessions.count }
     }
 
+    /// Sessions that finished a turn and are holding for your reply.
+    var waitingCount: Int {
+        snapshots.reduce(0) { $0 + $1.waitingSessions.count }
+    }
+
+    func count(for tab: PanelTab) -> Int {
+        switch tab {
+        case .working: return workingCount
+        case .waiting: return waitingCount
+        case .open: return openCount
+        }
+    }
+
     var visibleSnapshots: [AgentSnapshot] {
         let prefs = Preferences.shared
         return snapshots.filter { snapshot in

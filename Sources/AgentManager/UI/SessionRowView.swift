@@ -27,18 +27,14 @@ struct SessionRowView: View {
                     Text(agent.displayName)
                         .font(BrandFont.body(13, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text(working ? session.activityLine : "idle · \(idleFor)")
+                    Text(secondary)
                         .font(BrandFont.body(11))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
-                StatusPill(
-                    text: working ? "working" : "open",
-                    tone: working ? .positive : .neutral,
-                    showsDot: working
-                )
+                StatusPill(text: state.text, tone: state.tone, showsDot: state.dot, pulses: working)
             }
 
             metadata
@@ -60,6 +56,7 @@ struct SessionRowView: View {
 
             if !session.subAgents.isEmpty { subAgentToggle }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .glassTile(radius: 18, highlighted: hovered || isInspecting)
         .onHover { hovered = $0 }
@@ -110,8 +107,24 @@ struct SessionRowView: View {
         .padding(.top, 11)
     }
 
+    private var state: (text: String, tone: StatusPill.Tone, dot: Bool) {
+        switch session.activity {
+        case .working: return ("working", .positive, true)
+        case .waiting: return ("waiting on you", .warning, true)
+        case .idle: return ("open", .neutral, false)
+        }
+    }
+
+    private var secondary: String {
+        switch session.activity {
+        case .working: return session.activityLine
+        case .waiting: return "asked for your reply · \(idleFor)"
+        case .idle: return "idle · \(idleFor)"
+        }
+    }
+
     private var idleFor: String {
-        guard case .idle(let since) = session.activity, let since else { return "no recent activity" }
+        guard let since = session.activity.since else { return "no recent activity" }
         return QuotaBar.ago(since)
     }
 }
@@ -124,7 +137,12 @@ private struct Chip: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(.system(size: 8.5))
-            Text(text).font(.system(size: 10, design: .monospaced)).lineLimit(1)
+            Text(text)
+                .font(.system(size: 10, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: 96, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(.white.opacity(0.5))
         .padding(.horizontal, 7)

@@ -104,9 +104,20 @@ struct Usage: Equatable {
 /// activity is judged by how recently its transcript was written.
 enum Activity: Equatable {
     case working
+    /// Finished its turn and handed control back: it wants your reply before
+    /// anything else happens. Distinct from idle, which is nobody's turn.
+    case waiting(since: Date?)
     case idle(since: Date?)
 
     var isWorking: Bool { if case .working = self { return true }; return false }
+    var isWaiting: Bool { if case .waiting = self { return true }; return false }
+
+    var since: Date? {
+        switch self {
+        case .working: return nil
+        case .waiting(let date), .idle(let date): return date
+        }
+    }
 }
 
 struct RunningSession: Equatable, Identifiable {
@@ -157,6 +168,7 @@ struct AgentSnapshot: Identifiable, Equatable {
     var id: String { agent.rawValue }
     var isRunning: Bool { !sessions.isEmpty }
     var workingSessions: [RunningSession] { sessions.filter { $0.activity.isWorking } }
+    var waitingSessions: [RunningSession] { sessions.filter { $0.activity.isWaiting } }
     var openSessions: [RunningSession] { sessions.filter { !$0.activity.isWorking } }
     var isWorking: Bool { !workingSessions.isEmpty }
 }

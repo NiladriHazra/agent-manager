@@ -93,7 +93,16 @@ actor UsageIndex {
     /// Most recent write across a session's transcripts, which is the signal
     /// for whether the agent is actually doing anything.
     static func lastWrite(in roots: [URL], matching sessionID: String? = nil) -> Date? {
-        var newest: Date?
+        newestTranscript(in: roots, matching: sessionID)?.written
+    }
+
+    /// The same scan, keeping the file itself: reading the last record is what
+    /// separates a session that is mid-turn from one waiting on a reply.
+    static func newestTranscript(
+        in roots: [URL],
+        matching sessionID: String? = nil
+    ) -> (url: URL, written: Date)? {
+        var best: (url: URL, written: Date)?
         for root in roots {
             guard let walker = FileManager.default.enumerator(
                 at: root,
@@ -105,10 +114,10 @@ actor UsageIndex {
                 if let sessionID, !url.path.contains(sessionID) { continue }
                 let stamp = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                     .contentModificationDate
-                if let stamp, stamp > (newest ?? .distantPast) { newest = stamp }
+                if let stamp, stamp > (best?.written ?? .distantPast) { best = (url, stamp) }
             }
         }
-        return newest
+        return best
     }
 
     func sessionMeta(id: String) -> SessionMeta? {

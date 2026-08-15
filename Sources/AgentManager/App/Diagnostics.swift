@@ -63,6 +63,7 @@ enum Diagnostics {
                 let state: String
                 switch session.activity {
                 case .working: state = "WORKING"
+                case .waiting(let since): state = "WAITING " + (since.map { QuotaBar.ago($0) } ?? "")
                 case .idle(let since): state = "idle " + (since.map { QuotaBar.ago($0) } ?? "(unknown)")
                 }
                 print("            \u{21B3} \(pad(state, 16))\(session.activityLine)")

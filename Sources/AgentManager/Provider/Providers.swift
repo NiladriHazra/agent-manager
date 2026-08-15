@@ -41,6 +41,19 @@ func activity(lastWrite: Date?) -> Activity {
     return Date().timeIntervalSince(lastWrite) <= workingWindow ? .working : .idle(since: lastWrite)
 }
 
+/// Activity refined by what the transcript's last record actually says.
+///
+/// A session that wrote recently is not necessarily busy: finishing a turn is
+/// also a write. Only the transcript distinguishes the two.
+func activity(lastWrite: Date?, transcript: URL?, agent: AgentID) -> Activity {
+    guard let transcript,
+          TurnState.read(transcript: transcript, agent: agent) == .awaitingUser
+    else { return activity(lastWrite: lastWrite) }
+    // An ended turn is an ended turn whether it closed ten seconds or an hour
+    // ago: either way the next move is yours.
+    return .waiting(since: lastWrite)
+}
+
 // MARK: - Codex
 
 /// The only agent that writes its real limit to disk. Each session logs
@@ -105,10 +118,14 @@ struct CodexProvider: AgentProvider {
         snapshot.usage = TokenSources.codex(root: root, since: Date().addingTimeInterval(-7 * 86_400))
         snapshot.usageToday = TokenSources.codex(root: root, since: Date().addingTimeInterval(-86_400))
 
-        let codexWrite = UsageIndex.lastWrite(in: [root])
+        let codexTranscript = UsageIndex.newestTranscript(in: [root])
         snapshot.sessions = sessions.map {
             var copy = $0
-            copy.activity = activity(lastWrite: codexWrite)
+            copy.activity = activity(
+                lastWrite: codexTranscript?.written,
+                transcript: codexTranscript?.url,
+                agent: agent
+            )
             return copy
         }
         if let credits = limits.credits, credits.unlimited != true, let balance = credits.balance {
@@ -177,9 +194,12 @@ struct ClaudeProvider: AgentProvider {
             } else {
                 session.title = nil
             }
+            let transcript = UsageIndex.newestTranscript(in: [root], matching: session.sessionID)
+                ?? UsageIndex.newestTranscript(in: [root])
             session.activity = activity(
-                lastWrite: UsageIndex.lastWrite(in: [root], matching: session.sessionID)
-                    ?? UsageIndex.lastWrite(in: [root])
+                lastWrite: transcript?.written,
+                transcript: transcript?.url,
+                agent: agent
             )
             if let id = session.sessionID {
                 session.subAgents = SessionDetail.subAgents(sessionID: id, root: root)
