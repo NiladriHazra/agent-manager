@@ -23,13 +23,7 @@ struct MenuContentView: View {
                     .frame(width: 268)
             }
         }
-        .background {
-            if RenderMode.isOffscreen {
-                Theme.surface
-            } else {
-                VisualEffectBackground(material: .popover)
-            }
-        }
+        .background(RenderMode.isOffscreen ? AnyView(Theme.surface) : AnyView(Color.clear))
         .onAppear {
             model.menuOpened()
             // Offscreen renders open the side panel so it can be inspected.
@@ -56,6 +50,7 @@ struct MenuContentView: View {
             }
             .padding(.horizontal, 11)
             .padding(.bottom, 11)
+            .glassGroup()
         }
         .frame(width: 332)
     }
@@ -93,9 +88,6 @@ struct MenuContentView: View {
                 .font(BrandFont.body(15, weight: .bold))
                 .foregroundStyle(.white)
             Spacer()
-            Text("updated \(QuotaBar.ago(model.lastUpdated ?? Date()))")
-                .font(BrandFont.body(9.5))
-                .foregroundStyle(.white.opacity(0.32))
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
@@ -168,7 +160,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(nsImage: MenuBarGlyph.image(working: model.workingCount > 0))
+            Image(nsImage: MenuBarGlyph.klipeo(working: model.workingCount > 0))
             if !text.isEmpty { Text(text).monospacedDigit() }
         }
         .contextMenu {
