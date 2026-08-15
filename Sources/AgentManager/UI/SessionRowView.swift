@@ -110,7 +110,7 @@ struct SessionRowView: View {
     private var state: (text: String, tone: StatusPill.Tone, dot: Bool) {
         switch session.activity {
         case .working: return ("working", .positive, true)
-        case .waiting: return ("waiting on you", .warning, true)
+        case .waiting: return ("waiting", .warning, true)
         case .idle: return ("open", .neutral, false)
         }
     }

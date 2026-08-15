@@ -60,7 +60,6 @@ struct GlassTile: ViewModifier {
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
     }
 }
 
@@ -176,8 +175,21 @@ struct StatusPill: View {
         }
         .padding(.horizontal, 9)
         .frame(height: 21)
-        .glassCapsule(tint: tone.fill)
-        .glassRim(tone.border)
+        // Flat tonal capsule, exactly like the Klipeo StatusPill: a solid fill,
+        // a hairline tinted border and a light top edge. No glass, no shadow —
+        // glass here cast a halo that read as a smudge behind the pill.
+        .background(Capsule().fill(tone.fill))
+        .overlay(
+            Capsule().strokeBorder(
+                LinearGradient(
+                    colors: [tone.topHighlight, tone.border],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 0.8
+            )
+        )
+        .clipShape(Capsule())
     }
 }
 
@@ -216,7 +228,6 @@ struct StatusDot: View {
                         .offset(x: size * 0.2, y: size * 0.16)
                 }
                 .frame(width: size, height: size)
-                .shadow(color: color.opacity(0.7), radius: size * 0.5)
         }
         .frame(width: size, height: size)
     }
