@@ -39,11 +39,12 @@ enum AgentID: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// True when the mark is a single flat colour, so it can be re-tinted dark
-    /// on a lit chip. Multicolour marks (Gemini) must be left alone.
+    /// True only for marks that are plain white, which would vanish on a lit
+    /// chip and so get re-tinted dark. Marks carrying a brand colour, like
+    /// Claude's orange or Gemini's four-colour star, are left alone.
     var markIsMonochrome: Bool {
         switch self {
-        case .gemini: return false
+        case .gemini, .claude: return false
         default: return true
         }
     }

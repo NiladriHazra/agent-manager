@@ -7,6 +7,28 @@ import AppKit
 /// when the menu is highlighted. The centre fills in when something is working.
 enum MenuBarGlyph {
     nonisolated(unsafe) private static var cache: [Bool: NSImage] = [:]
+    nonisolated(unsafe) private static var klipeoCache: [Bool: NSImage] = [:]
+
+    /// Klipeo's own mark, as a template so macOS tints it for the current menu
+    /// bar. Built with the drawing-handler initialiser rather than lockFocus,
+    /// which can hand back an invalid image mid-render.
+    static func klipeo(working: Bool) -> NSImage {
+        if let cached = klipeoCache[working] { return cached }
+        guard let url = Bundle.module.url(forResource: "klipeo-mark", withExtension: "png"),
+              let source = NSImage(contentsOf: url), source.isValid
+        else { return image(working: working) }
+
+        let side: CGFloat = 16
+        let rendered = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            source.draw(in: rect, from: .zero, operation: .sourceOver,
+                        fraction: working ? 1.0 : 0.5)
+            return true
+        }
+        guard rendered.isValid else { return image(working: working) }
+        rendered.isTemplate = true
+        klipeoCache[working] = rendered
+        return rendered
+    }
 
     static func image(working: Bool) -> NSImage {
         if let cached = cache[working] { return cached }

@@ -1,45 +1,46 @@
 import SwiftUI
 
-/// Subagents open beside the list rather than inside it. A session with 13 of
-/// them would otherwise push the panel taller than the screen.
-struct SubAgentPanel: View {
-    let session: RunningSession
-    let onClose: () -> Void
+/// What the right-hand column is showing.
+///
+/// Both kinds of drill-down open sideways rather than pushing the list taller:
+/// a stack of terminals, or one terminal's subagents.
+enum DetailTarget: Equatable {
+    case sessions(AgentID)
+    case subAgents(pid: Int32)
+}
 
-    private var active: Int { session.subAgents.filter(\.isWorking).count }
+struct DetailPanel: View {
+    let title: String
+    let count: Int
+    let activeCount: Int
+    let onClose: () -> Void
+    let rows: AnyView
+
+    private let maxHeight: CGFloat = 420
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            // An explicit height, not a maximum: a ScrollView with only a
-            // maximum collapses to nothing inside MenuBarExtra's window. It
-            // also refuses to lay out offscreen, so snapshots use a plain stack.
+            // An explicit height, not a maximum: a ScrollView given only a
+            // maximum collapses to nothing inside MenuBarExtra's window.
             if RenderMode.isOffscreen {
-                VStack(spacing: 5) {
-                    ForEach(session.subAgents) { SubAgentRow(subAgent: $0) }
-                }
-                .padding(.horizontal, 11)
-                .padding(.bottom, 11)
+                rows.padding(.horizontal, 11).padding(.bottom, 11)
             } else {
                 ScrollView {
-                    VStack(spacing: 5) {
-                        ForEach(session.subAgents) { SubAgentRow(subAgent: $0) }
-                    }
-                    .padding(.horizontal, 11)
-                    .padding(.bottom, 11)
+                    rows.padding(.horizontal, 11).padding(.bottom, 11)
                 }
-                .frame(height: min(CGFloat(session.subAgents.count) * 48 + 14, 420))
+                .frame(height: min(CGFloat(count) * 74 + 16, maxHeight))
             }
         }
     }
 
     private var header: some View {
         HStack(spacing: 7) {
-            Text("Sub-agents")
+            Text(title)
                 .font(BrandFont.body(12, weight: .semibold))
                 .foregroundStyle(.white)
-            Text(verbatim: "\(session.subAgents.count)")
+            Text(verbatim: "\(count)")
                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
                 .padding(.horizontal, 5)
@@ -48,8 +49,8 @@ struct SubAgentPanel: View {
 
             Spacer()
 
-            if active > 0 {
-                StatusPill(text: "\(active) active", tone: .positive, showsDot: true)
+            if activeCount > 0 {
+                StatusPill(text: "\(activeCount) active", tone: .positive, showsDot: true)
                     .scaleEffect(0.9, anchor: .trailing)
             }
 
