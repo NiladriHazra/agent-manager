@@ -29,10 +29,22 @@ enum TerminalFocus {
         }
     }
 
-    /// Takes the table the caller already built: the scan runs every few
-    /// seconds and must not enumerate every process once per session.
+    /// Terminals that expose a tab's `tty`, so the exact session can be
+    /// selected rather than the app merely raised.
+    private static let scriptable: Set<String> = ["com.apple.Terminal", "com.googlecode.iterm2"]
+
+    /// Whether clicking would visibly do anything.
+    ///
+    /// Takes the table the caller already built: the scan runs every second and
+    /// must not enumerate every process once per session.
+    ///
+    /// Raising an app that is already frontmost looks broken — which is exactly
+    /// what happened for agents running inside a terminal that cannot be
+    /// scripted. Those rows offer no click at all rather than a dead one.
     static func canFocus(pid: Int32, in table: [Int32: ProcessScanner.Proc]) -> Bool {
-        owningApp(of: pid, table: table) != nil
+        guard let bundle = owningApp(of: pid, table: table) else { return false }
+        if let id = Bundle(url: bundle)?.bundleIdentifier, scriptable.contains(id) { return true }
+        return NSWorkspace.shared.frontmostApplication?.bundleURL != bundle
     }
 
     private static func owningApp(of pid: Int32) -> URL? {

@@ -32,6 +32,11 @@ struct SessionRowView: View {
                 }
 
                 Spacer(minLength: 8)
+                if session.canFocus {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.35))
+                }
                 StatusPill(text: state.text, tone: state.tone, indicator: state.indicator)
             }
 
@@ -140,7 +145,7 @@ struct SessionRowView: View {
         switch session.activity {
         case .working: return ("running", .positive, .typing)
         case .waiting: return ("waiting", .warning, .shimmer)
-        case .idle: return ("open", .neutral, .none)
+        case .idle: return ("idle", .neutral, .none)
         }
     }
 
