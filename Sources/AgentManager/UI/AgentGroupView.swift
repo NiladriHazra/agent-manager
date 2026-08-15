@@ -172,7 +172,10 @@ struct WindowLine: View {
     /// caption rather than adding a line nobody else can fill.
     private var spentLine: Text? {
         guard let cost = week?.cost, cost > 0 else { return nil }
-        return Text(String(format: "$%.2f spent, 7 days", cost))
+        return Text(String(format: "$%.2f", cost))
+            .font(BrandFont.body(10.5, weight: .bold))
+            .foregroundColor(.white)
+            + Text(" spent, 7 days")
     }
 
     /// A rolling window has no reset instant, so it states the span it covers

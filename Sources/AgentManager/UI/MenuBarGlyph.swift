@@ -90,3 +90,26 @@ enum MenuBarGlyph {
         return image
     }
 }
+
+extension MenuBarGlyph {
+    /// A vendor mark sized for the menu bar, as a template so macOS tints it
+    /// with the bar's own colour in light and dark.
+    nonisolated(unsafe) private static var markCache: [AgentID: NSImage] = [:]
+
+    static func mark(for agent: AgentID) -> NSImage? {
+        if let cached = markCache[agent] { return cached }
+        let url = Bundle.module.url(forResource: agent.logoName, withExtension: "svg")
+            ?? Bundle.module.url(forResource: agent.logoName, withExtension: "png")
+        guard let url, let source = NSImage(contentsOf: url), source.isValid else { return nil }
+
+        let side: CGFloat = 12
+        let rendered = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            return true
+        }
+        guard rendered.isValid else { return nil }
+        rendered.isTemplate = true
+        markCache[agent] = rendered
+        return rendered
+    }
+}

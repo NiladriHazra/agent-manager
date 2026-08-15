@@ -94,10 +94,46 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Group {
                 heading("Menu bar")
-                Picker("Show", selection: $prefs.menuBarMode) {
-                    ForEach(MenuBarMode.allCases) { Text($0.label).tag($0) }
+                caption("The Klipeo mark is always shown. Everything beside it is yours to choose.")
+                Toggle("Number of working agents", isOn: $prefs.showAgentCount)
+                Toggle("Percentages", isOn: $prefs.showPercentages)
+
+                if prefs.showPercentages {
+                    Picker("At most", selection: $prefs.maxMenuBarAgents) {
+                        Text("1 agent").tag(1)
+                        Text("2 agents").tag(2)
+                        Text("3 agents").tag(3)
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 200)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(AgentID.allCases.filter { percentSource(for: $0) != nil }) { agent in
+                            HStack(spacing: 9) {
+                                IconWell(agent: agent, size: 20)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(agent.displayName)
+                                        .font(BrandFont.body(11.5, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                    Text(percentSource(for: agent) ?? "")
+                                        .font(BrandFont.body(9.5))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                                Spacer()
+                                Toggle("", isOn: prefs.menuBarBinding(for: agent))
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .glassTile(radius: 12)
+                        }
+                    }
+                    caption("One agent shows its percentage alone. Two or more each carry their own mark, since bare percentages side by side do not say which is which. Choosing more than the limit drops the oldest.")
                 }
-                .pickerStyle(.radioGroup)
+
+                MenuBarPreview(model: model)
+                    .padding(.top, 2)
             }
 
             Group {
@@ -110,7 +146,7 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .frame(width: 220)
                 .onChange(of: prefs.refreshSeconds) { model.restartTimer() }
-                caption("An open panel always refreshes every few seconds.")
+                caption("An open panel refreshes every second.")
             }
 
             Group {
@@ -123,6 +159,14 @@ struct SettingsView: View {
         }
         .font(BrandFont.body(12))
         .foregroundStyle(.white.opacity(0.9))
+    }
+
+    /// What an agent's percentage would actually mean, so nobody switches on a
+    /// number without knowing what it measures.
+    private func percentSource(for agent: AgentID) -> String? {
+        if Metric.supported(by: agent).contains(.quota) { return "share of its weekly limit used" }
+        if Metric.supported(by: agent).contains(.context) { return "fullest live context" }
+        return nil
     }
 
     private var agents: some View {

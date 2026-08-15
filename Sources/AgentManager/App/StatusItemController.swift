@@ -50,20 +50,42 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         button.image = MenuBarGlyph.klipeo(working: model.workingCount > 0)
         button.imagePosition = .imageLeading
-        button.title = title.isEmpty ? "" : " \(title)"
+        button.attributedTitle = barTitle
         button.toolTip = "\(model.workingCount) working · \(model.waitingCount) waiting on you"
     }
 
-    private var title: String {
-        let quota = model.headlineQuota.map { "\(Int($0.quota.usedPercent))%" }
-        switch Preferences.shared.menuBarMode {
-        case .countAndQuota:
-            guard let quota else { return "\(model.workingCount)" }
-            return "\(model.workingCount) · \(quota)"
-        case .countOnly: return "\(model.workingCount)"
-        case .quotaOnly: return quota ?? "–"
-        case .iconOnly: return ""
+    /// The bar, assembled piece by piece: an optional agent count, then one
+    /// entry per chosen agent. A single agent shows its percentage alone; more
+    /// than one prefixes each with that agent's own mark, because two bare
+    /// percentages side by side say nothing about which is which.
+    private var barTitle: NSAttributedString {
+        let prefs = Preferences.shared
+        let text = NSMutableAttributedString()
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+
+        if prefs.showAgentCount {
+            text.append(NSAttributedString(string: " \(model.workingCount)", attributes: attributes))
         }
+
+        guard prefs.showPercentages else { return text }
+        let readings = model.menuBarReadings.prefix(prefs.maxMenuBarAgents)
+        let showsMarks = readings.count > 1
+
+        for (index, reading) in readings.enumerated() {
+            let separator = index == 0 && !prefs.showAgentCount ? " " : (showsMarks ? "  " : " · ")
+            text.append(NSAttributedString(string: separator, attributes: attributes))
+
+            if showsMarks, let mark = MenuBarGlyph.mark(for: reading.agent) {
+                let attachment = NSTextAttachment()
+                attachment.image = mark
+                attachment.bounds = CGRect(x: 0, y: -2, width: 11, height: 11)
+                text.append(NSAttributedString(attachment: attachment))
+                text.append(NSAttributedString(string: " ", attributes: attributes))
+            }
+            text.append(NSAttributedString(string: "\(reading.percent)%", attributes: attributes))
+        }
+        return text
     }
 
     @objc private func clicked() {

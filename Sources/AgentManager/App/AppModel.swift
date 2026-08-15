@@ -49,6 +49,26 @@ final class AppModel: ObservableObject {
         snapshots.reduce(0) { $0 + $1.waitingSessions.count }
     }
 
+    /// The one number worth putting in the menu bar for an agent.
+    ///
+    /// A vendor quota if there is one, otherwise the fullest live context,
+    /// which is the only other real percentage any of these agents produce.
+    /// Agents with neither contribute nothing rather than a made-up figure.
+    func headlinePercent(for agent: AgentID) -> Int? {
+        guard let snapshot = snapshots.first(where: { $0.agent == agent }) else { return nil }
+        if let quota = snapshot.quota { return Int(quota.usedPercent) }
+        let contexts = snapshot.sessions.compactMap { $0.chat?.contextFraction }
+        guard let fullest = contexts.max(), fullest > 0 else { return nil }
+        return Int(fullest * 100)
+    }
+
+    /// Agents the user picked that actually have a number today.
+    var menuBarReadings: [(agent: AgentID, percent: Int)] {
+        Preferences.shared.menuBarAgents.compactMap { agent in
+            headlinePercent(for: agent).map { (agent, $0) }
+        }
+    }
+
     func count(for tab: PanelTab) -> Int {
         switch tab {
         case .working: return workingCount

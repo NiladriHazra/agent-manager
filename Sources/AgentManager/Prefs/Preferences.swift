@@ -32,6 +32,14 @@ final class Preferences: ObservableObject {
     private let defaults: UserDefaults
 
     @Published var menuBarMode: MenuBarMode { didSet { defaults.set(menuBarMode.rawValue, forKey: Key.menuBarMode) } }
+    /// The mark is always shown; everything beside it is optional.
+    @Published var showAgentCount: Bool { didSet { defaults.set(showAgentCount, forKey: Key.showAgentCount) } }
+    @Published var showPercentages: Bool { didSet { defaults.set(showPercentages, forKey: Key.showPercentages) } }
+    /// Which agents contribute a percentage, in the order they were added.
+    @Published var menuBarAgents: [AgentID] {
+        didSet { defaults.set(menuBarAgents.map(\.rawValue), forKey: Key.menuBarAgents) }
+    }
+    @Published var maxMenuBarAgents: Int { didSet { defaults.set(maxMenuBarAgents, forKey: Key.maxMenuBarAgents) } }
     @Published var refreshSeconds: Int { didSet { defaults.set(refreshSeconds, forKey: Key.refreshSeconds) } }
     @Published var warnThreshold: Int { didSet { defaults.set(warnThreshold, forKey: Key.warnThreshold) } }
     @Published var criticalThreshold: Int { didSet { defaults.set(criticalThreshold, forKey: Key.criticalThreshold) } }
@@ -55,6 +63,10 @@ final class Preferences: ObservableObject {
 
     private enum Key {
         static let menuBarMode = "menuBarMode"
+        static let showAgentCount = "showAgentCount"
+        static let showPercentages = "showPercentages"
+        static let menuBarAgents = "menuBarAgents"
+        static let maxMenuBarAgents = "maxMenuBarAgents"
         static let refreshSeconds = "refreshSeconds"
         static let warnThreshold = "warnThreshold"
         static let criticalThreshold = "criticalThreshold"
@@ -69,6 +81,12 @@ final class Preferences: ObservableObject {
         menuBarMode = (defaults.string(forKey: Key.menuBarMode)
             .flatMap(MenuBarMode.init(rawValue:))) ?? .countAndQuota
         refreshSeconds = defaults.object(forKey: Key.refreshSeconds) as? Int ?? 60
+        showAgentCount = defaults.object(forKey: Key.showAgentCount) as? Bool ?? true
+        showPercentages = defaults.object(forKey: Key.showPercentages) as? Bool ?? true
+        maxMenuBarAgents = defaults.object(forKey: Key.maxMenuBarAgents) as? Int ?? 2
+        // Codex by default: it is the only agent that publishes a real limit.
+        menuBarAgents = (defaults.array(forKey: Key.menuBarAgents) as? [String])?
+            .compactMap(AgentID.init(rawValue:)) ?? [.codex]
         hiddenMetrics = (defaults.dictionary(forKey: Key.hiddenMetrics) as? [String: [String]] ?? [:])
             .mapValues(Set.init)
         warnThreshold = defaults.object(forKey: Key.warnThreshold) as? Int ?? 20
@@ -107,5 +125,22 @@ final class Preferences: ObservableObject {
             get: { self.isEnabled(metric, for: agent) },
             set: { self.setEnabled(metric, for: agent, $0) }
         )
+    }
+
+    func isInMenuBar(_ agent: AgentID) -> Bool { menuBarAgents.contains(agent) }
+
+    /// Adding beyond the cap drops the oldest, so the bar cannot silently grow
+    /// past the width the user asked for.
+    func setInMenuBar(_ agent: AgentID, _ included: Bool) {
+        var list = menuBarAgents.filter { $0 != agent }
+        if included {
+            list.append(agent)
+            if list.count > maxMenuBarAgents { list.removeFirst(list.count - maxMenuBarAgents) }
+        }
+        menuBarAgents = list
+    }
+
+    func menuBarBinding(for agent: AgentID) -> Binding<Bool> {
+        Binding(get: { self.isInMenuBar(agent) }, set: { self.setInMenuBar(agent, $0) })
     }
 }

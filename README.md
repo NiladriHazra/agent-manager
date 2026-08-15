@@ -1,6 +1,7 @@
-<img src="docs/klipeo-mark.png" width="76" align="right" alt="Klipeo">
-
-# agent-manager
+<div align="center">
+  <img src="docs/klipeo-mark.png" width="64" alt="Klipeo">
+  <h1>agent-manager</h1>
+</div>
 
 A macOS menu bar app that answers two questions about your coding agents: which
 ones are **actually working right now** and what each is doing, and how much
@@ -9,7 +10,9 @@ weekly quota is left before one of them stops mid-task.
 Native Swift and SwiftUI, no Electron. Reads only local files, sends nothing
 anywhere, and calls no undocumented vendor APIs.
 
-<img src="docs/screenshot.png" width="620" alt="The agent-manager dropdown">
+<p align="center">
+  <img src="docs/screenshot.png" width="560" alt="The agent-manager panel">
+</p>
 
 ## Why the rows differ
 
@@ -49,8 +52,14 @@ has spent and how full its context is:
 Right-click the menu bar item for Settings, Refresh and Quit. The Settings
 window has four sections:
 
-- **General** — menu bar display, refresh interval, low-quota thresholds,
-  launch at login
+- **General** — what the menu bar shows, refresh interval, low-quota
+  thresholds, launch at login. The mark is always there; the working-agent
+  count and the percentages are each optional, you pick which agents
+  contribute a percentage and how many at most, and a live preview shows the
+  combination before you close the window. One agent shows its percentage
+  alone; two or more each carry their own mark, since bare percentages side by
+  side do not say which is which. Only agents with a real percentage are
+  offered: a vendor limit where one exists, the fullest live context otherwise.
 - **Agents** — which agents appear at all
 - **Readings** — per agent, which of its readings a row may draw. Each agent is
   offered only what it genuinely writes to disk, so no switch here is

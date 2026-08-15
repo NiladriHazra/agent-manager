@@ -25,33 +25,34 @@ struct ChatLine: View {
         }
     }
 
+    /// A ring, not a second long bar. The window bar directly above is already
+    /// a full-width track, and two stacked bars read as one measurement split
+    /// in half rather than two unrelated things.
     private var contextBar: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.13))
-                    Capsule()
-                        .fill(contextTone)
-                        .frame(width: max(3, geo.size.width * chat.contextFraction))
-                }
+        HStack(spacing: 7) {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.14), lineWidth: 2.2)
+                Circle()
+                    .trim(from: 0, to: chat.contextFraction)
+                    .stroke(contextTone, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
             }
-            .frame(height: 4)
+            .frame(width: 14, height: 14)
 
-            HStack(spacing: 5) {
-                Text("context")
-                    .foregroundStyle(.white.opacity(0.38))
-                Text("\(short(chat.contextTokens)) / \(short(chat.contextWindow))")
-                    .foregroundStyle(.white.opacity(0.85))
-                    .monospacedDigit()
-                Text("(\(Int(chat.contextFraction * 100))%)")
-                    .foregroundStyle(contextTone)
-                Spacer(minLength: 4)
-                if let model = chat.modelLabel {
-                    Text(model).foregroundStyle(.white.opacity(0.35))
-                }
+            Text("context")
+                .foregroundStyle(.white.opacity(0.38))
+            Text("\(short(chat.contextTokens)) / \(short(chat.contextWindow))")
+                .foregroundStyle(.white.opacity(0.85))
+                .monospacedDigit()
+            Text("(\(Int(chat.contextFraction * 100))%)")
+                .foregroundStyle(contextTone)
+            Spacer(minLength: 4)
+            if let model = chat.modelLabel {
+                Text(model).foregroundStyle(.white.opacity(0.35))
             }
-            .font(BrandFont.body(9.5))
         }
+        .font(BrandFont.body(9.5))
     }
 
     private var tokenLine: some View {
