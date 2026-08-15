@@ -125,6 +125,8 @@ struct RunningSession: Equatable, Identifiable {
     /// Whether an owning terminal app was found. A row that cannot be focused
     /// must not offer a click that does nothing.
     var canFocus = false
+    /// Per-chat totals and context pressure, when the agent records them.
+    var chat: ChatStats?
     var subAgents: [SubAgent] = []
 
     var id: Int32 { pid }

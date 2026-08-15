@@ -315,3 +315,46 @@ extension View {
         }
     }
 }
+
+/// prompt-kit's `wave` loader: five bars rippling in a travelling sine.
+///
+/// Driven by TimelineView so every bar reads its height from one clock. Five
+/// independent repeating animations drift apart over the hours this panel
+/// stays open, which looks broken rather than alive.
+struct WaveLoader: View {
+    let color: Color
+    var animated = true
+    var barWidth: CGFloat = 1.6
+    var height: CGFloat = 11
+
+    private let bars = 5
+    private let period = 1.1
+
+    var body: some View {
+        if animated, !RenderMode.isOffscreen {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: period) / period
+                shape { index in
+                    let phase = t * 2 * .pi - Double(index) * 0.7
+                    return 0.35 + 0.65 * (sin(phase) + 1) / 2
+                }
+            }
+        } else {
+            // At rest the bars stay, flattened: the row still reads as the same
+            // component rather than swapping to a different mark.
+            shape { index in index == 2 ? 0.45 : 0.3 }
+        }
+    }
+
+    private func shape(_ scale: @escaping (Int) -> Double) -> some View {
+        HStack(alignment: .center, spacing: barWidth * 0.9) {
+            ForEach(0..<bars, id: \.self) { index in
+                Capsule()
+                    .fill(color)
+                    .frame(width: barWidth, height: height * scale(index))
+            }
+        }
+        .frame(width: CGFloat(bars) * barWidth * 1.9, height: height)
+    }
+}

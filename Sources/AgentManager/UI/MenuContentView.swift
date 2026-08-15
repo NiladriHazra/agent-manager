@@ -23,7 +23,9 @@ struct MenuContentView: View {
     @State private var primed = false
 
     var body: some View {
-        HStack(spacing: 0) {
+        // Top-aligned: the side panel is shorter than the list, and an HStack
+        // centres by default, which read as a huge gap above it.
+        HStack(alignment: .top, spacing: 0) {
             main
             if detail != nil {
                 Divider().overlay(Color.white.opacity(0.10))

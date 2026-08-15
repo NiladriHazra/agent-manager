@@ -37,17 +37,27 @@ struct SessionRowView: View {
 
             metadata
 
-            UsagePanel(
-                agent: agent,
-                quota: quota,
-                quotaObserved: quotaObserved,
-                usage: usage,
-                usageToday: usageToday,
-                includeCacheReads: prefs.includeCacheReads,
-                warn: prefs.warnThreshold,
-                critical: prefs.criticalThreshold
-            )
-            .padding(.top, 9)
+            // Token totals are per account, not per terminal. The side panel
+            // lists individual sessions, so it passes none — and an empty bar
+            // full of dashes is worse than no bar.
+            if quota != nil || usage != nil || usageToday != nil {
+                UsagePanel(
+                    agent: agent,
+                    quota: quota,
+                    quotaObserved: quotaObserved,
+                    usage: usage,
+                    usageToday: usageToday,
+                    includeCacheReads: prefs.includeCacheReads,
+                    warn: prefs.warnThreshold,
+                    critical: prefs.criticalThreshold
+                )
+                .padding(.top, 9)
+            }
+
+            if let chat = session.chat, chat.contextTokens > 0 {
+                ChatLine(chat: chat, tint: LogoTint.color(for: agent))
+                    .padding(.top, 9)
+            }
 
             if !session.subAgents.isEmpty { subAgentToggle }
         }
@@ -166,14 +176,11 @@ struct SubAgentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Group {
-                if subAgent.isWorking {
-                    TypingLoader(color: StatusPill.Tone.positive.dot, dot: 3.5)
-                } else {
-                    StatusDot(color: .white.opacity(0.28), size: 6)
-                }
-            }
-            .padding(.top, 3)
+            WaveLoader(
+                color: subAgent.isWorking ? StatusPill.Tone.positive.dot : .white.opacity(0.30),
+                animated: subAgent.isWorking
+            )
+            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(subAgent.label)

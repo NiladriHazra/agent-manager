@@ -202,6 +202,7 @@ struct ClaudeProvider: AgentProvider {
                 agent: agent
             )
             if let id = session.sessionID {
+                session.chat = await index.chat(id: id)
                 session.subAgents = SessionDetail.subAgents(sessionID: id, root: root)
                 session.branch = SessionDetail.branch(sessionID: id, root: root) ?? session.branch
             }
