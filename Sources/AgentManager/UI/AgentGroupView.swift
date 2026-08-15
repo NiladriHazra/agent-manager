@@ -125,19 +125,18 @@ struct StackedIcons: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // The discs behind are flat and opaque, not glass: translucent
-            // discs stacked on translucent discs just smear into one blur, and
-            // the front logo bled through them.
+            // Every disc carries the same mark and every disc is opaque, so the
+            // one in front hides the middle of the one behind and you see a
+            // stack of real logos rather than one logo on blank coins.
             ForEach(1..<max(depth, 1), id: \.self) { index in
-                Circle()
-                    .fill(Theme.surface)
-                    .overlay(Circle().strokeBorder(.white.opacity(0.16 - Double(index) * 0.04), lineWidth: 0.8))
-                    .frame(width: 30 - CGFloat(index) * 3, height: 30 - CGFloat(index) * 3)
-                    .offset(x: CGFloat(index) * 7)
+                IconWell(agent: agent, size: 30)
+                    .offset(x: CGFloat(index) * 9)
+                    .zIndex(-Double(index))
             }
             IconWell(agent: agent)
+                .zIndex(1)
         }
-        .frame(width: 30 + CGFloat(depth - 1) * 7, alignment: .leading)
+        .frame(width: 30 + CGFloat(depth - 1) * 9, alignment: .leading)
     }
 }
 

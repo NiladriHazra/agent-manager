@@ -219,7 +219,10 @@ struct IconWell: View {
         // The mark goes in an overlay, not behind: Liquid Glass composites
         // above whatever it is applied to, which hid the logo entirely.
         Circle()
-            .fill(Color.white.opacity(0.06))
+            // Opaque, not translucent: in a stack a see-through well let the
+            // disc behind bleed through and both logos turned to mush.
+            .fill(Theme.surface)
+            .overlay(Circle().fill(Color.white.opacity(0.06)))
             .overlay {
                 // Brushed-chrome bezel: a bright arc where the light lands, a
                 // dark one opposite, and a faint spectral split between them.
