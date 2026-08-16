@@ -19,6 +19,19 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     init(model: AppModel) {
         self.model = model
+
+        // macOS lays status items out right to left and clips from the LEFT
+        // when the bar overflows, so the newest item — placed leftmost by
+        // default — is always the first casualty. This is the position macOS
+        // itself writes when you Command-drag an item; setting it to zero asks
+        // for the rightmost slot a third-party item can hold, which is the far
+        // side of the queue for eviction. Only set when absent, so a position
+        // the user chose by dragging is never overwritten.
+        let positionKey = "NSStatusItem Preferred Position agent-manager"
+        if UserDefaults.standard.object(forKey: positionKey) == nil {
+            UserDefaults.standard.set(0, forKey: positionKey)
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
