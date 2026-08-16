@@ -21,8 +21,10 @@ fi
 
 cp "Resources/Info.plist" "$APP/Contents/Info.plist"
 
-if [ -f "$DIST/AppIcon.icns" ]; then
-  cp "$DIST/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Committed to the repo so a clean checkout builds with the real icon; the
+# old copy lived only in dist/ and was lost on every clean.
+if [ -f "Resources/AppIcon.icns" ]; then
+  cp "Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 fi
 
 # Ad-hoc signature: enough to run locally. Public distribution needs a
