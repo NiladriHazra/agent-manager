@@ -116,6 +116,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             popover.performClose(nil)
         } else {
             model.menuOpened()
+            model.refresh()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
             popover.contentViewController?.view.window?.makeKey()
         }

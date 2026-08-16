@@ -135,14 +135,21 @@ final class AppModel: ObservableObject {
 
     private func startTimer(refreshNow: Bool = true) {
         timer?.invalidate()
-        // An open panel is being read right now, so it refreshes far more
-        // often; a closed one only needs to keep the menu bar roughly current.
         // An open panel is being read right now: probes run concurrently and
-        // unchanged files are cached, so a one-second beat is affordable.
+        // unchanged files are cached, so a one-second beat is affordable. A
+        // closed one only needs to keep the menu bar roughly current.
         let interval = menuIsOpen ? 1 : TimeInterval(max(10, Preferences.shared.refreshSeconds))
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+
+        // .common, not the default mode. While a popover or a menu is open the
+        // run loop switches to event tracking, where a default-mode timer never
+        // fires — which is exactly when the panel is on screen being watched,
+        // so it sat frozen until something forced a refresh.
+        let created = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+        RunLoop.main.add(created, forMode: .common)
+        timer = created
+
         if refreshNow { refresh() }
     }
 
