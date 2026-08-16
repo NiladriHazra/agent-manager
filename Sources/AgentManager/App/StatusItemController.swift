@@ -14,6 +14,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     private var observation: NSKeyValueObservation?
     private var settingsWindow: NSWindow?
+    /// Set when the bar has no room for the full title, so the item keeps its
+    /// place instead of being dropped entirely.
+    private var compact = false
 
     init(model: AppModel) {
         self.model = model
@@ -59,8 +62,31 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         button.image = MenuBarGlyph.klipeo(working: model.workingCount > 0)
         button.imagePosition = .imageLeading
-        button.attributedTitle = barTitle
+        button.attributedTitle = compact ? NSAttributedString(string: "") : barTitle
         button.toolTip = "\(model.workingCount) working · \(model.waitingCount) waiting on you"
+        adjustForCrowding()
+    }
+
+    /// Screen recording and dictation both add their own indicators, and a full
+    /// bar makes macOS drop whatever no longer fits — which was this item,
+    /// title and all. Dropping to the mark alone keeps a foothold, and the
+    /// title returns as soon as there is room again.
+    private func adjustForCrowding() {
+        guard let button = statusItem.button, let window = button.window else { return }
+        guard let screen = window.screen ?? NSScreen.main else { return }
+
+        let frame = window.frame
+        let crowded = frame.minX < screen.visibleFrame.minX + 4 || frame.width < 24
+
+        if crowded, !compact {
+            compact = true
+            button.attributedTitle = NSAttributedString(string: "")
+        } else if !crowded, compact, frame.minX > screen.visibleFrame.minX + 80 {
+            // Hysteresis: restoring the title the instant one pixel frees up
+            // would flap between the two widths every tick.
+            compact = false
+            button.attributedTitle = barTitle
+        }
     }
 
     /// The bar, assembled piece by piece: an optional agent count, then one
