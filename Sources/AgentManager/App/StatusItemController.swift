@@ -20,6 +20,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
+        // Remembers its slot across launches, so it comes back where it was
+        // instead of being appended at the end of a crowded bar.
+        statusItem.autosaveName = "agent-manager"
+        statusItem.isVisible = true
+        statusItem.behavior = []
+
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
@@ -47,6 +53,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     private func render() {
+        // A bar with no room can leave the item hidden; asking for it back on
+        // every tick is cheap and makes a vanished icon self-healing.
+        if !statusItem.isVisible { statusItem.isVisible = true }
         guard let button = statusItem.button else { return }
         button.image = MenuBarGlyph.klipeo(working: model.workingCount > 0)
         button.imagePosition = .imageLeading
