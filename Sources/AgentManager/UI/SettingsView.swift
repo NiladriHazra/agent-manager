@@ -107,59 +107,13 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
 
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 5) {
                         ForEach(AgentID.allCases.filter { !PercentSource.available(for: $0).isEmpty }) { agent in
-                            VStack(alignment: .leading, spacing: 7) {
-                            HStack(spacing: 9) {
-                                IconWell(agent: agent, size: 20)
-                                Text(agent.displayName)
-                                    .font(BrandFont.body(11.5, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                if prefs.isInMenuBar(agent) {
-                                    Picker("", selection: prefs.styleBinding(for: agent)) {
-                                        ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
-                                    }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 108)
-                                }
-                                Toggle("", isOn: prefs.menuBarBinding(for: agent))
-                                    .labelsHidden()
-                                    .toggleStyle(.switch)
-                            }
-
-                            if prefs.isInMenuBar(agent) {
-                                let source = prefs.percentSource(for: agent)
-                                Picker("Measures", selection: prefs.percentSourceBinding(for: agent)) {
-                                    ForEach(PercentSource.available(for: agent)) { Text($0.label).tag($0) }
-                                }
-                                .pickerStyle(.menu)
-                                .font(BrandFont.body(10.5))
-
-                                if source.needsBudget {
-                                    let weekly = source == .weeklyBudget
-                                    Stepper(
-                                        "Budget \(prefs.budgetMillions(for: agent, weekly: weekly))M tokens "
-                                            + (weekly ? "per week" : "per day"),
-                                        value: prefs.budgetBinding(for: agent, weekly: weekly),
-                                        in: 1...5_000,
-                                        step: 10
-                                    )
-                                    .font(BrandFont.body(10.5))
-                                    Text("This agent publishes no limit of its own, so the percentage is measured against your figure.")
-                                        .font(BrandFont.body(9.5))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .glassTile(radius: 12)
+                            menuBarAgentRow(agent)
                         }
                     }
-                    caption("One agent shows its percentage alone. Two or more each carry their own mark, since bare percentages side by side do not say which is which. Choosing more than the limit drops the oldest.")
+
+                    caption("One agent shows its percentage alone; two or more each carry their own mark. Choosing more than the limit drops the oldest. Where an agent publishes no limit, the percentage is measured against the budget you set.")
                 }
 
                 MenuBarPreview(model: model)
@@ -189,6 +143,60 @@ struct SettingsView: View {
         }
         .font(BrandFont.body(12))
         .foregroundStyle(.white.opacity(0.9))
+    }
+
+
+    /// Two lines at most: identity and presentation on the first, what the
+    /// number measures on the second, and the second only when the agent is
+    /// actually in the bar.
+    @ViewBuilder
+    private func menuBarAgentRow(_ agent: AgentID) -> some View {
+        let source = prefs.percentSource(for: agent)
+        let weekly = source == .weeklyBudget
+
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                IconWell(agent: agent, size: 19)
+                Text(agent.displayName)
+                    .font(BrandFont.body(11.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 6)
+                if prefs.isInMenuBar(agent) {
+                    Picker("", selection: prefs.styleBinding(for: agent)) {
+                        ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 96)
+                }
+                Toggle("", isOn: prefs.menuBarBinding(for: agent))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            if prefs.isInMenuBar(agent) {
+                HStack(spacing: 8) {
+                    Picker("", selection: prefs.percentSourceBinding(for: agent)) {
+                        ForEach(PercentSource.available(for: agent)) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 176)
+
+                    if source.needsBudget {
+                        Stepper(value: prefs.budgetBinding(for: agent, weekly: weekly), in: 1...5_000, step: 10) {
+                            Text("of \(prefs.budgetMillions(for: agent, weekly: weekly))M \(weekly ? "per week" : "per day")")
+                                .font(BrandFont.body(10.5))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .glassTile(radius: 12)
     }
 
     private var agents: some View {
