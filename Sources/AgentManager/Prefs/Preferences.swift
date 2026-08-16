@@ -40,6 +40,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(menuBarAgents.map(\.rawValue), forKey: Key.menuBarAgents) }
     }
     @Published var maxMenuBarAgents: Int { didSet { defaults.set(maxMenuBarAgents, forKey: Key.maxMenuBarAgents) } }
+    /// Icon alone, always. A crowded bar — screen recording and dictation both
+    /// add system indicators — makes macOS drop whatever no longer fits, and a
+    /// bare mark is the smallest target we can present.
+    @Published var forceCompactMenuBar: Bool {
+        didSet { defaults.set(forceCompactMenuBar, forKey: Key.forceCompactMenuBar) }
+    }
     /// Per agent: which percentage the menu bar shows.
     @Published var percentSources: [String: String] {
         didSet { defaults.set(percentSources, forKey: Key.percentSources) }
@@ -84,6 +90,7 @@ final class Preferences: ObservableObject {
         static let menuBarAgents = "menuBarAgents"
         static let maxMenuBarAgents = "maxMenuBarAgents"
         static let menuBarStyles = "menuBarStyles"
+        static let forceCompactMenuBar = "forceCompactMenuBar"
         static let percentSources = "percentSources"
         static let weeklyBudgets = "weeklyBudgets"
         static let dailyBudgets = "dailyBudgets"
@@ -105,6 +112,7 @@ final class Preferences: ObservableObject {
         showPercentages = defaults.object(forKey: Key.showPercentages) as? Bool ?? true
         maxMenuBarAgents = defaults.object(forKey: Key.maxMenuBarAgents) as? Int ?? 2
         menuBarStyles = defaults.dictionary(forKey: Key.menuBarStyles) as? [String: String] ?? [:]
+        forceCompactMenuBar = defaults.bool(forKey: Key.forceCompactMenuBar)
         percentSources = defaults.dictionary(forKey: Key.percentSources) as? [String: String] ?? [:]
         weeklyBudgets = defaults.dictionary(forKey: Key.weeklyBudgets) as? [String: Int] ?? [:]
         dailyBudgets = defaults.dictionary(forKey: Key.dailyBudgets) as? [String: Int] ?? [:]

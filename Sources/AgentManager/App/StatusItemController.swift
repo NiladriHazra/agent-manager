@@ -17,6 +17,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Set when the bar has no room for the full title, so the item keeps its
     /// place instead of being dropped entirely.
     private var compact = false
+    private var crowdedUntil = Date.distantPast
 
     init(model: AppModel) {
         self.model = model
@@ -62,8 +63,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         button.image = MenuBarGlyph.klipeo(working: model.workingCount > 0)
         button.imagePosition = .imageLeading
-        button.attributedTitle = compact ? NSAttributedString(string: "") : barTitle
+        let wantsCompact = compact || Preferences.shared.forceCompactMenuBar
+        button.attributedTitle = wantsCompact ? NSAttributedString(string: "") : barTitle
         button.toolTip = "\(model.workingCount) working · \(model.waitingCount) waiting on you"
+        guard !Preferences.shared.forceCompactMenuBar else { return }
         adjustForCrowding()
     }
 
@@ -72,18 +75,36 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// title and all. Dropping to the mark alone keeps a foothold, and the
     /// title returns as soon as there is room again.
     private func adjustForCrowding() {
-        guard let button = statusItem.button, let window = button.window else { return }
+        guard let button = statusItem.button else { return }
+
+        // No window at all means the item is not being drawn: the bar has run
+        // out of room and macOS has dropped it. Shrinking to the mark is the
+        // only lever available, so take it and stay there for a while.
+        guard let window = button.window else {
+            if !compact {
+                compact = true
+                button.attributedTitle = NSAttributedString(string: "")
+            }
+            crowdedUntil = Date().addingTimeInterval(120)
+            return
+        }
         guard let screen = window.screen ?? NSScreen.main else { return }
 
         let frame = window.frame
         let crowded = frame.minX < screen.visibleFrame.minX + 4 || frame.width < 24
 
-        if crowded, !compact {
-            compact = true
-            button.attributedTitle = NSAttributedString(string: "")
-        } else if !crowded, compact, frame.minX > screen.visibleFrame.minX + 80 {
-            // Hysteresis: restoring the title the instant one pixel frees up
-            // would flap between the two widths every tick.
+        if crowded {
+            crowdedUntil = Date().addingTimeInterval(120)
+            if !compact {
+                compact = true
+                button.attributedTitle = NSAttributedString(string: "")
+            }
+            return
+        }
+
+        // Only widen again once the bar has been roomy for a while: restoring
+        // the title the instant a pixel frees up flaps between two widths.
+        if compact, Date() > crowdedUntil, frame.minX > screen.visibleFrame.minX + 80 {
             compact = false
             button.attributedTitle = barTitle
         }

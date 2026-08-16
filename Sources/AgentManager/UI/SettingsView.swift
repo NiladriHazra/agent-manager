@@ -95,10 +95,14 @@ struct SettingsView: View {
             Group {
                 heading("Menu bar")
                 caption("The Klipeo mark is always shown. Everything beside it is yours to choose.")
+                Toggle("Icon only, always", isOn: $prefs.forceCompactMenuBar)
+                caption("Screen recording and dictation add their own indicators, and a full bar makes macOS drop whatever no longer fits. A bare mark is the smallest thing to drop.")
                 Toggle("Number of working agents", isOn: $prefs.showAgentCount)
+                    .disabled(prefs.forceCompactMenuBar)
                 Toggle("Percentages", isOn: $prefs.showPercentages)
+                    .disabled(prefs.forceCompactMenuBar)
 
-                if prefs.showPercentages {
+                if prefs.showPercentages, !prefs.forceCompactMenuBar {
                     Picker("At most", selection: $prefs.maxMenuBarAgents) {
                         Text("1 agent").tag(1)
                         Text("2 agents").tag(2)
