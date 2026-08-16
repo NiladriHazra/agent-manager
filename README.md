@@ -1,165 +1,169 @@
 <div align="center">
-  <img src="docs/klipeo-mark.png" width="64" alt="Klipeo">
+  <img src="docs/klipeo-mark.png" width="64" alt="">
   <h1>agent-manager</h1>
+  <p><b>Every coding agent you're running, in one menu bar icon.</b></p>
+  <p>
+    Which ones are working · which are waiting on <i>you</i> · what each has spent
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/macOS-14%2B-000?style=flat-square" alt="macOS 14+">
+    <img src="https://img.shields.io/badge/Swift-99%25-F05138?style=flat-square" alt="Swift">
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT">
+    <img src="https://img.shields.io/badge/network-none-2ea44f?style=flat-square" alt="No network">
+  </p>
 </div>
 
-A macOS menu bar app that answers two questions about your coding agents: which
-ones are **actually working right now** and what each is doing, and how much
-weekly quota is left before one of them stops mid-task.
+<div align="center">
+  <img src="docs/demo.gif" width="820" alt="agent-manager in use">
+  <p><sub><a href="https://github.com/NiladriHazra/agent-manager/releases/download/v0.1.0/demo.mp4">Full quality video</a></sub></p>
+</div>
 
-Native Swift and SwiftUI, no Electron. Reads only local files, sends nothing
-anywhere, and calls no undocumented vendor APIs.
+---
 
-<p align="center">
-  <img src="docs/screenshot.png" width="560" alt="The agent-manager panel">
-</p>
+You have Claude in one terminal, three Codex sessions in three more, OpenCode
+somewhere behind them. Two finished ten minutes ago and are sitting there
+waiting for your reply. One is about to hit its weekly limit mid-task.
 
-## Why the rows differ
+There is no way to see any of that without checking every window.
 
-Agents are wildly inconsistent about what they write to disk, and the interface
-is honest about that rather than inventing numbers:
+This is a small menu bar app that answers it in one glance. Native Swift and
+SwiftUI, no Electron, about 3 MB. It reads **only local files** on your own
+machine, sends nothing anywhere, and calls no undocumented vendor APIs.
 
-| Agent | Running and activity | Tokens | Quota |
-| --- | --- | --- | --- |
-| Codex | yes | yes | **real limit**, straight from its own session log, plus credit balance |
-| Claude Code | yes, with the session title | yes, plus per-chat context | none published |
-| OpenCode | yes, with the session title | yes, per session, with spend and model | none published |
-| Grok | yes | yes, with spend | none published |
-| Cursor, Gemini, Antigravity, Hermes | yes | nothing on disk | none published |
+## Install
 
-A quota bar with a reset countdown only ever appears when the vendor genuinely
-wrote a limit to disk. Everything else is labelled `usage`, meaning tokens
-counted from local transcripts, which is what you spent rather than what you
-have left. The two are never mixed. Agents that record nothing show presence
-only; no number is invented to fill the column.
+**Download** — [latest release](https://github.com/NiladriHazra/agent-manager/releases/latest), unzip, drag to Applications. Or paste this:
 
-## Per-chat detail
+```sh
+curl -L https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.zip -o /tmp/am.zip \
+  && unzip -oq /tmp/am.zip -d /Applications \
+  && xattr -dr com.apple.quarantine /Applications/agent-manager.app \
+  && open /Applications/agent-manager.app
+```
 
-Where an agent records enough, a session row also carries what that one chat
-has spent and how full its context is:
+The `xattr` line matters. The build is **ad-hoc signed**, not notarized — I
+don't pay Apple's $99/year — so macOS quarantines it on download and refuses to
+open it without that. If you'd rather not run it, right-click the app and
+choose **Open** the first time instead, which does the same thing through the
+GUI.
 
-- **Context until compact** — the tokens the model held on its most recent
-  turn, against its window. It climbs through a long conversation and drops the
-  moment the agent compacts, so it answers "how much room is left" directly.
-  The window tier is inferred from the reading itself, since the transcript
-  records a model family but not which tier the session opened with.
-- **Input, output and thinking tokens** for that chat, plus its turn count
-- **Model name**, so you can see which sessions are on which model
-- **Spend**, for the two agents that publish a price
-
-## Settings
-
-Right-click the menu bar item for Settings, Refresh and Quit. The Settings
-window has four sections:
-
-- **General** — what the menu bar shows, refresh interval, low-quota
-  thresholds, launch at login. The mark is always there; the working-agent
-  count and the percentages are each optional, you pick which agents
-  contribute a percentage and how many at most, and a live preview shows the
-  combination before you close the window. One agent shows its percentage
-  alone; two or more each carry their own mark, since bare percentages side by
-  side do not say which is which. Only agents with a real percentage are
-  offered: a vendor limit where one exists, the fullest live context otherwise.
-- **Agents** — which agents appear at all
-- **Readings** — per agent, which of its readings a row may draw. Each agent is
-  offered only what it genuinely writes to disk, so no switch here is
-  decorative: Codex has a quota switch, Claude has context and per-chat tokens,
-  OpenCode and Grok have spend.
-- **About**
-
-## Clicking a session
-
-Clicking a session row raises the terminal that owns it. The owning app is
-found by walking up the parent chain from the agent, through its shell, to the
-first process inside an `.app` bundle. Terminal.app and iTerm2 also expose a
-tab's `tty`, so for those two the exact tab is selected; other terminals can
-only be brought to the front.
-
-## Installing
-
-Requires macOS 14 or later, and Command Line Tools for the build (no Xcode).
+**Build from source** — needs Xcode Command Line Tools, nothing else:
 
 ```sh
 git clone https://github.com/NiladriHazra/agent-manager
-cd agent-manager
-./scripts/build.sh
-open dist/agent-manager.app
+cd agent-manager && ./scripts/build.sh && open dist/agent-manager.app
 ```
 
-The build is ad-hoc signed, so if you move the app somewhere Gatekeeper is
-suspicious of, right-click it and choose Open the first time.
+There is no Dock icon by design. Look for the mark in your menu bar. Turn on
+**Launch at login** in Settings so it survives a reboot.
 
-## Working, waiting, open
+## What you get
 
-Three tabs, each backed by something actually written to disk.
+**Three tabs, each backed by something actually written to disk.**
 
-**Working** — the agent wrote to its transcript in the last three minutes and
-that transcript does not end on a finished turn.
+| | meaning | how it is known |
+| --- | --- | --- |
+| **Working** | mid-task right now | transcript written in the last 3 minutes, and its last record is not an ended turn |
+| **Waiting** | finished, wants your reply | the last record **is** an ended turn: `task_complete` for Codex, `stop_reason: end_turn` for Claude, a completed assistant message for OpenCode |
+| **Open** | alive, but neither | a live process with no recent activity |
 
-**Waiting** — the last record *is* the end of a turn: `task_complete` for Codex,
-`stop_reason: end_turn` for Claude. The agent has handed control back and the
-next move is yours. Note that approval prompts are never written to a
-transcript, so this means "finished its turn", which includes but is not limited
-to a question waiting on screen.
+A live process is not the same as a working one. A session parked at a prompt
+stays alive for hours — on the machine this was built against, that was the
+difference between "9 running" and the honest answer, 2.
 
-**Open** — alive, but neither of the above.
+**Per agent** — quota or usage across today and the last 7 days, spend where
+the vendor publishes a price, the model in use, and a model selector when an
+agent has used more than one. Multiple terminals of the same tool stack into a
+single row that expands sideways.
 
-The panel lists only agents that are actually working. A live process is not
-the same as a working one: a session left open at a prompt stays alive for
-hours, so activity is judged by how recently the agent wrote to its own
-transcript. On the machine this was built against that was the difference
-between "9 running" and the honest answer, 2. Idle sessions are counted
-separately as open, and shown only if you ask for them.
+**Per session** — branch, working directory, pid, sub-agents, and for Claude a
+**context bar** showing how close that chat is to compacting. Click a row to
+raise its terminal; Terminal.app and iTerm2 select the exact tab.
 
-Quota readings carry their age. A vendor only writes its limit while the agent
-runs, so a number can be hours stale; when it is, the row says "as of 27m ago"
-instead of pretending it is current.
+## Why the rows differ
+
+Agents are wildly inconsistent about what they record, and this is honest about
+that rather than inventing numbers:
+
+| agent | activity | tokens | limit |
+| --- | --- | --- | --- |
+| **Codex** | yes | yes | **real quota**, from its own session log, plus credit balance |
+| **Claude Code** | yes, with session titles | yes, plus per-chat context | none published |
+| **OpenCode** | yes, with session titles | yes, per session, with spend and model | none published |
+| **Grok** | yes | yes, with spend | none published |
+| Cursor, Gemini, Antigravity, Hermes | yes | nothing on disk | none published |
+
+A quota bar with a reset countdown appears **only** where the vendor genuinely
+wrote a limit to disk. Everything else is labelled as locally counted usage,
+which is what you spent, not what you have left. The two are never mixed, and
+nothing is invented to fill an empty column.
+
+Codex is the only agent that publishes a limit. For the others you can set your
+own weekly or daily budget in Settings, and the percentage is measured against
+**your** figure — the app says so rather than implying it came from the vendor.
+
+## Menu bar, your way
+
+The mark is always there. Everything beside it is yours to choose: the count of
+working agents, and a percentage for up to three agents. One agent shows its
+number alone; two or more each carry their own logo, because bare percentages
+side by side don't say which is which.
+
+Per agent, choose what its percentage measures — vendor quota, a weekly or
+daily budget you set, or live context — and whether it shows as icon, number,
+or both. A live preview in Settings shows the combination before you commit.
 
 ## Settings
 
-Open them from the dropdown footer:
+Right-click the menu bar icon for **Settings**, **Refresh** and **Quit**.
 
-- which agents appear, and whether to hide ones that are not installed
-- what the menu bar shows: count and quota, count only, quota only, or icon only
-- refresh interval
-- amber and red thresholds for a low quota
-- whether cache reads count toward usage totals (off by default, see below)
-- launch at login
+- **General** — menu bar composition, refresh interval, low-quota thresholds, launch at login
+- **Agents** — which agents appear at all
+- **Readings** — per agent, which readings a row may draw. Each agent is offered only what it genuinely writes to disk, so no switch here is decorative
+- **About**
+
+## If the icon disappears
+
+macOS lays status items out right to left and **clips from the left** when the
+bar overflows. Screen recording and dictation both add system indicators, and
+those always win. The app is still running; there is no API to claim a slot.
+
+- The app asks for the rightmost slot on first launch, so it is last in the eviction queue
+- **⌥⌘A** opens the same panel in a floating window from anywhere, so you're never locked out
+- ⌘-drag the icon to move it; the position sticks
+- **Settings → Icon only, always** makes it the smallest possible target
+- A menu bar manager like [Ice](https://github.com/jordanbaird/Ice) is the only thing that truly guarantees a slot
 
 ## How it stays cheap
 
-An always-on menu bar app has no business burning CPU, and the data here is
-large: 2.2 GB of Codex sessions and 500 MB of Claude transcripts on the machine
-this was built against, including one single 295 MB session file.
+An always-on menu bar app has no business burning CPU, and the data is large:
+2.2 GB of Codex sessions and 500 MB of Claude transcripts on the machine this
+was built against, including one 295 MB session file.
 
-- **Codex quota** is the final `token_count` record in the newest session, found
-  by reading the last 64 KB and widening only if needed. Measured at 8 ms.
-- **Claude usage** is an incremental index keyed by `(device, inode)`, so a
-  refresh reads only the bytes appended since last time and skips untouched
-  files without opening them. A cold build takes about a second; a warm refresh
-  measured 30 ms.
-- **OpenCode** totals are already aggregated per session in its SQLite database,
-  so one read-only query covers the week.
-- **Grok usage** comes from its per-turn `usage` records, tail-read per session.
-- **Process detection** reads the kernel process table directly instead of
-  forking `ps`, and takes about 6 ms. Matching is on the exec path plus the
-  first two arguments, because the short name the kernel reports is useless:
-  Claude runs from a version-named binary and reports `2.1.233`, `cursor-agent`
-  is a shell script that execs node, and Hermes is `python3 .../bin/hermes`.
+- **Codex quota** is the last `token_count` record in the newest session, found by reading the final 64 KB and widening only if needed — 8 ms
+- **Claude usage** is an incremental index keyed by `(device, inode)`, so a refresh reads only bytes appended since last time and skips untouched files without opening them. Cold build ~1 s, warm refresh **~130 ms**
+- **OpenCode** totals are already aggregated in SQLite, so one read-only query covers the week
+- **Process detection** reads the kernel process table directly instead of forking `ps` — ~30 ms, on its own 2-second beat, so a new agent appears almost immediately
+- Providers are probed concurrently, and unchanged files are never re-read
 
-No code path can read an entire session file.
+No code path reads an entire session file.
+
+Process matching is on the exec path plus the first two arguments, because the
+short name the kernel reports is useless: Claude runs from a version-named
+binary and reports `2.1.233`, `cursor-agent` is a shell script that execs node,
+and Hermes is `python3 …/bin/hermes`.
+
+## Troubleshooting
+
+`agent-manager --diagnose` prints exactly what each provider read, with
+timings, session states, TTYs and per-model totals. Use it when a number looks
+wrong — it is the same code path the app uses, so it cannot disagree.
 
 ## Notes
 
-- `agent-manager --diagnose` prints exactly what each provider read, with timings.
-  Use it when a number looks wrong.
-- Claude's cache-read tokens run around a hundred times larger than everything
-  else, so they are excluded from the headline figure by default. The setting is
-  there if you want them.
-- The Codex quota is per account. If you use more than one, you see one of them.
-- Logos are the vendors' own marks, in their real brand colours.
-- The interface follows the Klipeo design system and uses macOS 26 Liquid Glass
-  where the system provides it, falling back to a hand-built material below that.
+- Claude's cache-read tokens run about a hundred times larger than everything else, so they are excluded from headline figures by default. The setting is there if you want them
+- The Codex quota is per account. If you use more than one, you see one of them
+- Logos are the vendors' own marks
 
 ## Licence
 
