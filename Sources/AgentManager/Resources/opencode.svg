@@ -1,4 +1,1 @@
-<svg viewBox="118 86 276 340" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M320 224V352H192V224H320Z" fill="#9C9A9A"/>
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="#FFFFFF"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="118 86 276 340"><path fill="#9C9A9A" d="M320 224V352H192V224H320Z"/><path fill="#FFF" fill-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" clip-rule="evenodd"/></svg>
