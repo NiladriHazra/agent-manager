@@ -15,7 +15,7 @@
 
 <div align="center">
   <img src="docs/demo.gif" width="820" alt="agent-manager in use">
-  <p><sub><a href="https://github.com/NiladriHazra/agent-manager/releases/download/v0.1.0/demo.mp4">Full quality video</a></sub></p>
+  <p><sub><a href="https://github.com/NiladriHazra/agent-manager/releases/download/v0.1.0/demo.mp4">Watch the full 31-second walkthrough</a> — settings, model selector, sub-agents</sub></p>
 </div>
 
 ---
