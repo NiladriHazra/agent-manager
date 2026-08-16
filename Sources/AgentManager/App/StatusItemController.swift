@@ -14,10 +14,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     private var observation: NSKeyValueObservation?
     private var settingsWindow: NSWindow?
-    /// Set when the bar has no room for the full title, so the item keeps its
-    /// place instead of being dropped entirely.
-    private var compact = false
-    private var crowdedUntil = Date.distantPast
 
     init(model: AppModel) {
         self.model = model
@@ -63,51 +59,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         button.image = MenuBarGlyph.klipeo(working: model.workingCount > 0)
         button.imagePosition = .imageLeading
-        let wantsCompact = compact || Preferences.shared.forceCompactMenuBar
-        button.attributedTitle = wantsCompact ? NSAttributedString(string: "") : barTitle
+        // Auto-shrinking on a crowded bar was tried and removed: there is no
+        // reliable signal for "macOS dropped me", and every proxy for it
+        // latched the title off when nothing was wrong. The explicit setting
+        // below is honest about what it does.
+        button.attributedTitle = Preferences.shared.forceCompactMenuBar
+            ? NSAttributedString(string: "")
+            : barTitle
         button.toolTip = "\(model.workingCount) working · \(model.waitingCount) waiting on you"
-        guard !Preferences.shared.forceCompactMenuBar else { return }
-        adjustForCrowding()
-    }
-
-    /// Screen recording and dictation both add their own indicators, and a full
-    /// bar makes macOS drop whatever no longer fits — which was this item,
-    /// title and all. Dropping to the mark alone keeps a foothold, and the
-    /// title returns as soon as there is room again.
-    private func adjustForCrowding() {
-        guard let button = statusItem.button else { return }
-
-        // No window at all means the item is not being drawn: the bar has run
-        // out of room and macOS has dropped it. Shrinking to the mark is the
-        // only lever available, so take it and stay there for a while.
-        guard let window = button.window else {
-            if !compact {
-                compact = true
-                button.attributedTitle = NSAttributedString(string: "")
-            }
-            crowdedUntil = Date().addingTimeInterval(120)
-            return
-        }
-        guard let screen = window.screen ?? NSScreen.main else { return }
-
-        let frame = window.frame
-        let crowded = frame.minX < screen.visibleFrame.minX + 4 || frame.width < 24
-
-        if crowded {
-            crowdedUntil = Date().addingTimeInterval(120)
-            if !compact {
-                compact = true
-                button.attributedTitle = NSAttributedString(string: "")
-            }
-            return
-        }
-
-        // Only widen again once the bar has been roomy for a while: restoring
-        // the title the instant a pixel frees up flaps between two widths.
-        if compact, Date() > crowdedUntil, frame.minX > screen.visibleFrame.minX + 80 {
-            compact = false
-            button.attributedTitle = barTitle
-        }
     }
 
     /// The bar, assembled piece by piece: an optional agent count, then one
