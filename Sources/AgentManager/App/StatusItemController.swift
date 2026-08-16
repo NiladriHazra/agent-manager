@@ -14,6 +14,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     private var observation: NSKeyValueObservation?
     private var settingsWindow: NSWindow?
+    private var hotkey: Hotkey?
+    private var floating: NSWindow?
 
     init(model: AppModel) {
         self.model = model
@@ -41,6 +43,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         render()
+
+        // The way back in when macOS drops the item from a crowded bar.
+        hotkey = Hotkey { [weak self] in self?.toggleFloating() }
 
         // The title tracks the model, so the bar stays current while closed.
         observation = nil
@@ -130,6 +135,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func showMenu() {
         let menu = NSMenu()
+        menu.addItem(withTitle: "Open in a window  ⌥⌘A", action: #selector(openFloating), keyEquivalent: "")
+            .target = self
         menu.addItem(withTitle: "Refresh now", action: #selector(refresh), keyEquivalent: "r")
             .target = self
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -145,7 +152,48 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         statusItem.menu = nil
     }
 
+    /// A floating copy of the panel, for when there is no icon left to click.
+    /// Deliberately a panel that joins every Space and sits above normal
+    /// windows, since it is summoned over whatever you are working in.
+    func toggleFloating() {
+        if let floating, floating.isVisible {
+            floating.orderOut(nil)
+            model.menuClosed()
+            return
+        }
+
+        model.menuOpened()
+        model.refresh()
+
+        let window = floating ?? {
+            let panel = NSPanel(
+                contentRect: NSRect(x: 0, y: 0, width: 332, height: 420),
+                styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            panel.titlebarAppearsTransparent = true
+            panel.titleVisibility = .hidden
+            panel.isMovableByWindowBackground = true
+            panel.backgroundColor = NSColor(red: 0.055, green: 0.055, blue: 0.051, alpha: 1)
+            panel.level = .floating
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            panel.isReleasedWhenClosed = false
+            let host = NSHostingController(rootView: MenuContentView(model: model))
+            host.sizingOptions = [.preferredContentSize]
+            panel.contentViewController = host
+            floating = panel
+            return panel
+        }()
+
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func refresh() { model.refresh() }
+
+    @objc private func openFloating() { toggleFloating() }
 
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 
