@@ -108,17 +108,13 @@ struct SettingsView: View {
                     .frame(width: 200)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(AgentID.allCases.filter { percentSource(for: $0) != nil }) { agent in
+                        ForEach(AgentID.allCases.filter { !PercentSource.available(for: $0).isEmpty }) { agent in
+                            VStack(alignment: .leading, spacing: 7) {
                             HStack(spacing: 9) {
                                 IconWell(agent: agent, size: 20)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(agent.displayName)
-                                        .font(BrandFont.body(11.5, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    Text(percentSource(for: agent) ?? "")
-                                        .font(BrandFont.body(9.5))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                }
+                                Text(agent.displayName)
+                                    .font(BrandFont.body(11.5, weight: .semibold))
+                                    .foregroundStyle(.white)
                                 Spacer()
                                 if prefs.isInMenuBar(agent) {
                                     Picker("", selection: prefs.styleBinding(for: agent)) {
@@ -132,8 +128,34 @@ struct SettingsView: View {
                                     .labelsHidden()
                                     .toggleStyle(.switch)
                             }
+
+                            if prefs.isInMenuBar(agent) {
+                                let source = prefs.percentSource(for: agent)
+                                Picker("Measures", selection: prefs.percentSourceBinding(for: agent)) {
+                                    ForEach(PercentSource.available(for: agent)) { Text($0.label).tag($0) }
+                                }
+                                .pickerStyle(.menu)
+                                .font(BrandFont.body(10.5))
+
+                                if source.needsBudget {
+                                    let weekly = source == .weeklyBudget
+                                    Stepper(
+                                        "Budget \(prefs.budgetMillions(for: agent, weekly: weekly))M tokens "
+                                            + (weekly ? "per week" : "per day"),
+                                        value: prefs.budgetBinding(for: agent, weekly: weekly),
+                                        in: 1...5_000,
+                                        step: 10
+                                    )
+                                    .font(BrandFont.body(10.5))
+                                    Text("This agent publishes no limit of its own, so the percentage is measured against your figure.")
+                                        .font(BrandFont.body(9.5))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            }
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
+                            .padding(.vertical, 8)
                             .glassTile(radius: 12)
                         }
                     }
@@ -167,14 +189,6 @@ struct SettingsView: View {
         }
         .font(BrandFont.body(12))
         .foregroundStyle(.white.opacity(0.9))
-    }
-
-    /// What an agent's percentage would actually mean, so nobody switches on a
-    /// number without knowing what it measures.
-    private func percentSource(for agent: AgentID) -> String? {
-        if Metric.supported(by: agent).contains(.quota) { return "share of its weekly limit used" }
-        if Metric.supported(by: agent).contains(.context) { return "fullest live context" }
-        return nil
     }
 
     private var agents: some View {

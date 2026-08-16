@@ -56,17 +56,44 @@ final class AppModel: ObservableObject {
     /// Agents with neither contribute nothing rather than a made-up figure.
     func headlinePercent(for agent: AgentID) -> Int? {
         guard let snapshot = snapshots.first(where: { $0.agent == agent }) else { return nil }
-        if let quota = snapshot.quota { return Int(quota.usedPercent) }
-        // The session you are actually in: working first, then the one that
-        // wrote most recently. Taking the fullest made the number jump between
-        // unrelated sessions on every refresh.
-        let ordered = snapshot.sessions.sorted { lhs, rhs in
-            if lhs.activity.isWorking != rhs.activity.isWorking { return lhs.activity.isWorking }
-            return (lhs.activity.since ?? .distantPast) > (rhs.activity.since ?? .distantPast)
+        let prefs = Preferences.shared
+        let includeCacheReads = prefs.includeCacheReads
+
+        switch prefs.percentSource(for: agent) {
+        case .quota:
+            return snapshot.quota.map { Int($0.usedPercent) }
+
+        case .weeklyBudget:
+            guard let week = snapshot.usage else { return nil }
+            return share(
+                used: week.total(includingCacheReads: includeCacheReads),
+                budgetMillions: prefs.budgetMillions(for: agent, weekly: true)
+            )
+
+        case .dailyBudget:
+            guard let day = snapshot.usageToday else { return nil }
+            return share(
+                used: day.total(includingCacheReads: includeCacheReads),
+                budgetMillions: prefs.budgetMillions(for: agent, weekly: false)
+            )
+
+        case .context:
+            // The session you are actually in: working first, then the one that
+            // wrote most recently. Taking the fullest made the number jump
+            // between unrelated sessions on every refresh.
+            let ordered = snapshot.sessions.sorted { lhs, rhs in
+                if lhs.activity.isWorking != rhs.activity.isWorking { return lhs.activity.isWorking }
+                return (lhs.activity.since ?? .distantPast) > (rhs.activity.since ?? .distantPast)
+            }
+            guard let fraction = ordered.compactMap({ $0.chat?.contextFraction }).first,
+                  fraction > 0 else { return nil }
+            return Int(fraction * 100)
         }
-        guard let fraction = ordered.compactMap({ $0.chat?.contextFraction }).first,
-              fraction > 0 else { return nil }
-        return Int(fraction * 100)
+    }
+
+    private func share(used: Int, budgetMillions: Int) -> Int? {
+        guard budgetMillions > 0 else { return nil }
+        return min(Int(Double(used) / Double(budgetMillions * 1_000_000) * 100), 999)
     }
 
     /// Agents the user picked that actually have a number today.

@@ -40,6 +40,18 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(menuBarAgents.map(\.rawValue), forKey: Key.menuBarAgents) }
     }
     @Published var maxMenuBarAgents: Int { didSet { defaults.set(maxMenuBarAgents, forKey: Key.maxMenuBarAgents) } }
+    /// Per agent: which percentage the menu bar shows.
+    @Published var percentSources: [String: String] {
+        didSet { defaults.set(percentSources, forKey: Key.percentSources) }
+    }
+    /// Weekly and daily token budgets, in millions, for agents that publish no
+    /// limit of their own.
+    @Published var weeklyBudgets: [String: Int] {
+        didSet { defaults.set(weeklyBudgets, forKey: Key.weeklyBudgets) }
+    }
+    @Published var dailyBudgets: [String: Int] {
+        didSet { defaults.set(dailyBudgets, forKey: Key.dailyBudgets) }
+    }
     /// Per agent: mark, number, or both.
     @Published var menuBarStyles: [String: String] {
         didSet { defaults.set(menuBarStyles, forKey: Key.menuBarStyles) }
@@ -72,6 +84,9 @@ final class Preferences: ObservableObject {
         static let menuBarAgents = "menuBarAgents"
         static let maxMenuBarAgents = "maxMenuBarAgents"
         static let menuBarStyles = "menuBarStyles"
+        static let percentSources = "percentSources"
+        static let weeklyBudgets = "weeklyBudgets"
+        static let dailyBudgets = "dailyBudgets"
         static let refreshSeconds = "refreshSeconds"
         static let warnThreshold = "warnThreshold"
         static let criticalThreshold = "criticalThreshold"
@@ -90,6 +105,9 @@ final class Preferences: ObservableObject {
         showPercentages = defaults.object(forKey: Key.showPercentages) as? Bool ?? true
         maxMenuBarAgents = defaults.object(forKey: Key.maxMenuBarAgents) as? Int ?? 2
         menuBarStyles = defaults.dictionary(forKey: Key.menuBarStyles) as? [String: String] ?? [:]
+        percentSources = defaults.dictionary(forKey: Key.percentSources) as? [String: String] ?? [:]
+        weeklyBudgets = defaults.dictionary(forKey: Key.weeklyBudgets) as? [String: Int] ?? [:]
+        dailyBudgets = defaults.dictionary(forKey: Key.dailyBudgets) as? [String: Int] ?? [:]
         // Codex by default: it is the only agent that publishes a real limit.
         menuBarAgents = (defaults.array(forKey: Key.menuBarAgents) as? [String])?
             .compactMap(AgentID.init(rawValue:)) ?? [.codex]
@@ -165,5 +183,40 @@ final class Preferences: ObservableObject {
 
     func styleBinding(for agent: AgentID) -> Binding<MenuBarStyle> {
         Binding(get: { self.style(for: agent) }, set: { self.setStyle($0, for: agent) })
+    }
+
+    /// A vendor quota when the agent has one, otherwise the week against a
+    /// budget, which is the figure people actually watch.
+    func percentSource(for agent: AgentID) -> PercentSource {
+        let available = PercentSource.available(for: agent)
+        if let stored = percentSources[agent.rawValue].flatMap(PercentSource.init(rawValue:)),
+           available.contains(stored) {
+            return stored
+        }
+        return available.first ?? .context
+    }
+
+    func setPercentSource(_ source: PercentSource, for agent: AgentID) {
+        percentSources[agent.rawValue] = source.rawValue
+    }
+
+    func percentSourceBinding(for agent: AgentID) -> Binding<PercentSource> {
+        Binding(get: { self.percentSource(for: agent) }, set: { self.setPercentSource($0, for: agent) })
+    }
+
+    /// Budgets are held in millions of tokens, which is the scale these agents
+    /// actually run at: a week of Claude here is ~186M.
+    func budgetMillions(for agent: AgentID, weekly: Bool) -> Int {
+        (weekly ? weeklyBudgets : dailyBudgets)[agent.rawValue] ?? (weekly ? 200 : 40)
+    }
+
+    func budgetBinding(for agent: AgentID, weekly: Bool) -> Binding<Int> {
+        Binding(
+            get: { self.budgetMillions(for: agent, weekly: weekly) },
+            set: { value in
+                if weekly { self.weeklyBudgets[agent.rawValue] = max(1, value) }
+                else { self.dailyBudgets[agent.rawValue] = max(1, value) }
+            }
+        )
     }
 }
