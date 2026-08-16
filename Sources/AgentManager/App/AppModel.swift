@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     private let index = UsageIndex()
     private var providers: [AgentProvider] = []
     private var timer: Timer?
+    private var processTimer: Timer?
     private var menuIsOpen = false
 
     init() {
@@ -160,6 +161,40 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Process-only pass. Starting an agent should show up at once, and a
+    /// kernel process scan costs ~30 ms, so it runs on its own fast beat while
+    /// the expensive usage indexing stays on the slow one.
+    private func scanProcesses() {
+        Task.detached(priority: .utility) {
+            let running = ProcessScanner.runningAgents()
+            await MainActor.run { self.merge(running) }
+        }
+    }
+
+    /// Keeps each agent's existing readings and swaps in the live session list,
+    /// so a new terminal appears immediately with its numbers filled in by the
+    /// next full pass rather than blanking the row.
+    private func merge(_ running: [RunningSession]) {
+        var updated = snapshots
+        for index in updated.indices {
+            let mine = running.filter { $0.agent == updated[index].agent }
+            let existing = updated[index].sessions
+            guard mine.map(\.pid) != existing.map(\.pid) else { continue }
+            updated[index].sessions = mine.map { session in
+                var copy = session
+                if let known = existing.first(where: { $0.pid == session.pid }) {
+                    copy.activity = known.activity
+                    copy.title = known.title
+                    copy.branch = known.branch
+                    copy.chat = known.chat
+                    copy.subAgents = known.subAgents
+                }
+                return copy
+            }
+        }
+        if updated != snapshots { snapshots = updated }
+    }
+
     private func startTimer(refreshNow: Bool = true) {
         timer?.invalidate()
         // An open panel is being read right now: probes run concurrently and
@@ -176,6 +211,13 @@ final class AppModel: ObservableObject {
         }
         RunLoop.main.add(created, forMode: .common)
         timer = created
+
+        processTimer?.invalidate()
+        let scanner = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.scanProcesses() }
+        }
+        RunLoop.main.add(scanner, forMode: .common)
+        processTimer = scanner
 
         if refreshNow { refresh() }
     }

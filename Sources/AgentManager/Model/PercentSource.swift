@@ -16,10 +16,10 @@ enum PercentSource: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .quota: return "Vendor quota used"
-        case .weeklyBudget: return "Week against my budget"
-        case .dailyBudget: return "Today against my budget"
-        case .context: return "Live context filled"
+        case .quota: return "Vendor quota"
+        case .weeklyBudget: return "Weekly budget"
+        case .dailyBudget: return "Daily budget"
+        case .context: return "Live context"
         }
     }
 

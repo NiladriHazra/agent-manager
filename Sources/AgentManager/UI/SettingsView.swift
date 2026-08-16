@@ -181,14 +181,21 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 176)
+                    .frame(width: 132)
 
                     if source.needsBudget {
+                        Text("of")
+                            .font(BrandFont.body(10.5))
+                            .foregroundStyle(.white.opacity(0.4))
                         Stepper(value: prefs.budgetBinding(for: agent, weekly: weekly), in: 1...5_000, step: 10) {
-                            Text("of \(prefs.budgetMillions(for: agent, weekly: weekly))M \(weekly ? "per week" : "per day")")
-                                .font(BrandFont.body(10.5))
-                                .foregroundStyle(.white.opacity(0.7))
+                            Text("\(prefs.budgetMillions(for: agent, weekly: weekly))M")
+                                .font(BrandFont.body(11, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .monospacedDigit()
                         }
+                        Text(weekly ? "per week" : "per day")
+                            .font(BrandFont.body(10.5))
+                            .foregroundStyle(.white.opacity(0.4))
                     }
                     Spacer(minLength: 0)
                 }

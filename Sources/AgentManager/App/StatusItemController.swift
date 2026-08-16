@@ -157,12 +157,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 460),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            // No fullSizeContentView: with a transparent title bar the content
+            // scrolled up underneath the traffic lights and the window title.
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "agent-manager Settings"
-        window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
         window.center()
