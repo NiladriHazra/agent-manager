@@ -6,6 +6,9 @@
     Which ones are working · which are waiting on <i>you</i> · what each has spent
   </p>
   <p>
+    <a href="https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.zip"><img src="https://img.shields.io/badge/Download%20for%20macOS-1.1%20MB-0a84ff?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  </p>
+  <p>
     <img src="https://img.shields.io/badge/macOS-14%2B-000?style=flat-square" alt="macOS 14+">
     <img src="https://img.shields.io/badge/Swift-99%25-F05138?style=flat-square" alt="Swift">
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT">
