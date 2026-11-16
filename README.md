@@ -6,7 +6,7 @@
     Which ones are working · which are waiting on <i>you</i> · what each has spent
   </p>
   <p>
-    <a href="https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.zip"><img src="https://img.shields.io/badge/Download%20for%20macOS-1.1%20MB-0a84ff?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+    <a href="https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.dmg"><img src="https://img.shields.io/badge/Download%20for%20macOS-signed%20%26%20notarized-0a84ff?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
   </p>
   <p>
     <img src="https://img.shields.io/badge/macOS-14%2B-000?style=flat-square" alt="macOS 14+">
@@ -35,20 +35,17 @@ machine, sends nothing anywhere, and calls no undocumented vendor APIs.
 
 ## Install
 
-**Download** — [latest release](https://github.com/NiladriHazra/agent-manager/releases/latest), unzip, drag to Applications. Or paste this:
+**Download** — [agent-manager.dmg](https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.dmg), open it, and drag the app to Applications. Or from a terminal:
 
 ```sh
 curl -L https://github.com/NiladriHazra/agent-manager/releases/latest/download/agent-manager.zip -o /tmp/am.zip \
   && unzip -oq /tmp/am.zip -d /Applications \
-  && xattr -dr com.apple.quarantine /Applications/agent-manager.app \
   && open /Applications/agent-manager.app
 ```
 
-The `xattr` line matters. The build is **ad-hoc signed**, not notarized — I
-don't pay Apple's $99/year — so macOS quarantines it on download and refuses to
-open it without that. If you'd rather not run it, right-click the app and
-choose **Open** the first time instead, which does the same thing through the
-GUI.
+Releases are a universal binary (Apple Silicon and Intel), signed with a
+Developer ID and notarized by Apple, so macOS opens them with no warning and
+no `xattr` workaround.
 
 **Build from source** — needs Xcode Command Line Tools, nothing else:
 
@@ -56,6 +53,9 @@ GUI.
 git clone https://github.com/NiladriHazra/agent-manager
 cd agent-manager && ./scripts/build.sh && open dist/agent-manager.app
 ```
+
+Local builds are ad-hoc signed. To cut a signed, notarized release, set
+`SIGN_IDENTITY` and `NOTARY_PROFILE` and run `./scripts/release.sh`.
 
 There is no Dock icon by design. Look for the mark in your menu bar. Turn on
 **Launch at login** in Settings so it survives a reboot.

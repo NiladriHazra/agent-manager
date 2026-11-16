@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened runtime with no exceptions: the app reads local files and lists
+     processes, neither of which needs an entitlement outside the sandbox. -->
+<plist version="1.0">
+<dict/>
+</plist>
