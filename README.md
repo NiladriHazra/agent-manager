@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/macOS-14%2B-000?style=flat-square" alt="macOS 14+">
     <img src="https://img.shields.io/badge/Swift-99%25-F05138?style=flat-square" alt="Swift">
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT">
-    <img src="https://img.shields.io/badge/network-none-2ea44f?style=flat-square" alt="No network">
+    <img src="https://img.shields.io/badge/network-off%20by%20default-2ea44f?style=flat-square" alt="No network by default">
   </p>
 </div>
 
@@ -31,7 +31,7 @@ There is no way to see any of that without checking every window.
 
 This is a small menu bar app that answers it in one glance. Native Swift and
 SwiftUI, no Electron, about 3 MB. It reads **only local files** on your own
-machine, sends nothing anywhere, and calls no undocumented vendor APIs.
+machine, sends nothing anywhere by default, and calls no undocumented vendor APIs.
 
 ## Install
 
@@ -124,6 +124,24 @@ Right-click the menu bar icon for **Settings**, **Refresh** and **Quit**.
 - **Agents** — which agents appear at all
 - **Readings** — per agent, which readings a row may draw. Each agent is offered only what it genuinely writes to disk, so no switch here is decorative
 - **About**
+
+## Live status (optional)
+
+Off by default. To publish a small JSON status to your own HTTPS endpoint,
+set these keys in the `com.niladri.agent-manager` UserDefaults domain:
+
+| key | type | meaning |
+| --- | --- | --- |
+| `liveStatusURL` | String | Full HTTPS endpoint URL. Missing or empty means no requests |
+| `liveStatusToken` | String | Sent as `Authorization: Bearer <token>`. Missing or empty also disables publishing |
+| `liveStatusProjects` | Array of strings | Repo folder names allowed to appear publicly; all other projects are sent as `null`. Defaults to an empty allowlist |
+
+Changes apply without restarting. Updates are coalesced to at most one POST
+every 30 seconds, with a heartbeat every 5 minutes even when unchanged.
+The payload includes session counts, agent names, today's token totals (using
+the cache-read preference), and up to 12 session states with allowlisted project
+names. It never includes titles, branches, paths, prompts, chat content, pids or
+TTYs. Remove either the URL or token to turn publishing off.
 
 ## If the icon disappears
 

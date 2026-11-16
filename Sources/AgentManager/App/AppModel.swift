@@ -15,6 +15,7 @@ final class AppModel: ObservableObject {
     private var isRefreshing = false
 
     private let index = UsageIndex()
+    private let liveStatusPublisher = LiveStatusPublisher()
     private var providers: [AgentProvider] = []
     private var timer: Timer?
     private var processTimer: Timer?
@@ -23,6 +24,7 @@ final class AppModel: ObservableObject {
     init() {
         providers = allProviders(index: index)
         snapshots = providers.map { AgentSnapshot(agent: $0.agent) }
+        liveStatusPublisher.publish(snapshots)
         startTimer()
     }
 
@@ -155,6 +157,7 @@ final class AppModel: ObservableObject {
             let result = built
             await MainActor.run {
                 if result != self.snapshots { self.snapshots = result }
+                self.liveStatusPublisher.publish(self.snapshots)
                 self.lastUpdated = Date()
                 self.isRefreshing = false
             }
@@ -193,6 +196,7 @@ final class AppModel: ObservableObject {
             }
         }
         if updated != snapshots { snapshots = updated }
+        liveStatusPublisher.publish(snapshots)
     }
 
     private func startTimer(refreshNow: Bool = true) {
